@@ -65,15 +65,18 @@ enum mode_e {
 /******************************************************************************
 * Variables
 *******************************************************************************/
+// Keypad map
+const char keymap[19] = "123A456B789C*0#DNF";  // N = NoKey, F = Fail
+// Led map
+const byte ledB[5] = {GPIO_LED_B0, GPIO_LED_B1, GPIO_LED_B2, GPIO_LED_B3, GPIO_LED_B4};
+const byte ledY[5] = {GPIO_LED_Y0, GPIO_LED_Y1, GPIO_LED_Y2, GPIO_LED_Y3, GPIO_LED_Y4};
+
 // Instances
 LiquidCrystal_I2C lcd(I2C_ADR_LCD, 20, 4);   // I2C LCD 20x4 line display
 I2CKeyPad keypad(I2C_ADR_KEY);               // I2C Keypad (with PCF8574)
 
 // State variable
 mode_e mode = MODE_START;
-
-// Keypad map
-char keymap[19] = "123A456B789C*0#DNF";  // N = NoKey, F = Fail
 
 /******************************************************************************
 * Init Functions
@@ -122,13 +125,33 @@ void Keypad_Init(void) {
 }
 
 /******************************************************************************
+* Generic Functions
+*******************************************************************************/
+/*
+ *  Blink LEDs
+ */
+void BlinkLED(void) {
+    static uint8_t i;
+    if(i < 5)                       digitalWrite(ledB[i], HIGH);
+    else if((i >= 5) && (i < 10))   digitalWrite(ledY[i%5], HIGH);
+    else if((i >= 10) && (i < 15))  digitalWrite(ledB[i%5], LOW);
+    else if((i >= 15) && (i < 20))  digitalWrite(ledY[i%5], LOW);
+    //Check
+    i++;
+    if(i >= 20) i = 0;
+    //Delay
+    delay(50);
+}
+
+/******************************************************************************
 * FSM Functions
 *******************************************************************************/
 /*
  *  Start Loop Function
  */
 void Start_Loop() {
-
+    // Blink
+    BlinkLED();
 }
 
 /*
@@ -166,6 +189,7 @@ void Mode_D_Loop() {
  *  Setup main function
  */
 void setup() {
+    // Init
     GPIO_Init();
     I2C_Init();
     LCD_Init();
