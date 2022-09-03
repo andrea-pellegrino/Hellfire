@@ -77,6 +77,7 @@ I2CKeyPad keypad(I2C_ADR_KEY);               // I2C Keypad (with PCF8574)
 
 // State variable
 mode_e mode = MODE_START;
+mode_e selmode = MODE_START;
 
 /******************************************************************************
 * Init Functions
@@ -84,7 +85,7 @@ mode_e mode = MODE_START;
 /*
  *  GPIO Pin Initialization
  */
-void GPIO_Init(void){
+void GPIO_Init(void) {
     pinMode(GPIO_LED_B0, OUTPUT);
     pinMode(GPIO_LED_B1, OUTPUT);
     pinMode(GPIO_LED_B2, OUTPUT);
@@ -132,15 +133,86 @@ void Keypad_Init(void) {
  */
 void BlinkLED(void) {
     static uint8_t i;
-    if(i < 5)                       digitalWrite(ledB[i], HIGH);
-    else if((i >= 5) && (i < 10))   digitalWrite(ledY[i%5], HIGH);
-    else if((i >= 10) && (i < 15))  digitalWrite(ledB[i%5], LOW);
-    else if((i >= 15) && (i < 20))  digitalWrite(ledY[i%5], LOW);
+    if (i < 5)                       digitalWrite(ledB[i], HIGH);
+    else if ((i >= 5) && (i < 10))   digitalWrite(ledY[i%5], HIGH);
+    else if ((i >= 10) && (i < 15))  digitalWrite(ledB[i%5], LOW);
+    else if ((i >= 15) && (i < 20))  digitalWrite(ledY[i%5], LOW);
     //Check
     i++;
-    if(i >= 20) i = 0;
+    if (i >= 20) i = 0;
     //Delay
     delay(50);
+}
+
+/*
+ *  Start select mode
+ */
+void SetMode(void) {
+    char ch;
+    if(selmode == MODE_START) {
+        // LCD Message
+        lcd.setCursor(0, 0);
+        lcd.print("SELECT MODE GAME");
+        // Select mode from keypad
+        if (keypad.isPressed())  ch = keypad.getChar();
+        switch (ch) {
+            case 'A':
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: A   DOMINATION");
+                selmode = MODE_A_DOMINATION;
+                break;
+            case 'B':
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: B    JOINT OP.");
+                selmode = MODE_B_JOINT;
+                break;
+            case 'C':
+                lcd.setCursor(0, 3);
+                lcd.print("MODE:        CLASSIC");
+                selmode = MODE_C_CLASSIC;
+                break;
+            case 'D':
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: D       POINTS");
+                selmode = MODE_D_POINTS;
+                break;
+            default:
+                break;
+        }
+    }
+    if(selmode != MODE_START) {
+        // LCD Message
+        lcd.setCursor(0, 1);
+        lcd.print("CONFIRM SELECTION?");
+        // Confirm from keypad
+        if (keypad.isPressed())  ch = keypad.getChar();
+        switch (ch) {
+            case '*':
+                mode = selmode;
+                selmode = MODE_START;
+                // Reset 1nd & 2th line
+                lcd.setCursor(0, 0);
+                lcd.print("                    ");
+                lcd.setCursor(0, 1);
+                lcd.print("                    ");
+                // Reset lights
+                for (uint8_t i = 0; i < 5; i++) {
+                    digitalWrite(ledB[i], LOW);
+                    digitalWrite(ledY[i], LOW);
+                }
+                break;
+            case '#':
+                selmode = MODE_START;
+                // Reset 2nd & 4th line
+                lcd.setCursor(0, 3);
+                lcd.print("                    ");
+                lcd.setCursor(0, 1);
+                lcd.print("                    ");
+                break;
+            default:
+                break;
+        }
+    }
 }
 
 /******************************************************************************
@@ -152,6 +224,8 @@ void BlinkLED(void) {
 void Start_Loop() {
     // Blink
     BlinkLED();
+    // Set mode
+    SetMode();
 }
 
 /*
