@@ -55,7 +55,8 @@
 *******************************************************************************/
 // Game mode (main loop FSM)
 enum mode_e {
-    MODE_START,
+    MODE_SELECT,
+    MODE_SET_TIME,
     MODE_A_DOMINATION,
     MODE_B_JOINT,
     MODE_C_CLASSIC,
@@ -76,8 +77,8 @@ LiquidCrystal_I2C lcd(I2C_ADR_LCD, 20, 4);   // I2C LCD 20x4 line display
 I2CKeyPad keypad(I2C_ADR_KEY);               // I2C Keypad (with PCF8574)
 
 // State variable
-mode_e mode = MODE_START;
-mode_e selmode = MODE_START;
+mode_e mode = MODE_SELECT;
+mode_e selmode = MODE_SELECT;
 
 /******************************************************************************
 * Init Functions
@@ -147,113 +148,75 @@ void BlinkLED(void) {
 /*
  *  Start select mode
  */
-void SetMode(void) {
+void SelectMode(void) {
     char ch;
-    if(selmode == MODE_START) {
-        // LCD Message
-        lcd.setCursor(0, 0);
-        lcd.print("SELECT MODE GAME");
-        // Select mode from keypad
-        if (keypad.isPressed())  ch = keypad.getChar();
-        switch (ch) {
-            case 'A':
-                lcd.setCursor(0, 3);
-                lcd.print("MODE: A   DOMINATION");
-                selmode = MODE_A_DOMINATION;
-                break;
-            case 'B':
-                lcd.setCursor(0, 3);
-                lcd.print("MODE: B    JOINT OP.");
-                selmode = MODE_B_JOINT;
-                break;
-            case 'C':
-                lcd.setCursor(0, 3);
-                lcd.print("MODE:        CLASSIC");
-                selmode = MODE_C_CLASSIC;
-                break;
-            case 'D':
-                lcd.setCursor(0, 3);
-                lcd.print("MODE: D       POINTS");
-                selmode = MODE_D_POINTS;
-                break;
-            default:
-                break;
-        }
-    }
-    if(selmode != MODE_START) {
-        // LCD Message
-        lcd.setCursor(0, 1);
-        lcd.print("CONFIRM SELECTION?");
-        // Confirm from keypad
-        if (keypad.isPressed())  ch = keypad.getChar();
-        switch (ch) {
-            case '*':
-                mode = selmode;
-                selmode = MODE_START;
-                // Reset 1nd & 2th line
-                lcd.setCursor(0, 0);
-                lcd.print("                    ");
-                lcd.setCursor(0, 1);
-                lcd.print("                    ");
-                // Reset lights
-                for (uint8_t i = 0; i < 5; i++) {
-                    digitalWrite(ledB[i], LOW);
-                    digitalWrite(ledY[i], LOW);
-                }
-                break;
-            case '#':
-                selmode = MODE_START;
-                // Reset 2nd & 4th line
-                lcd.setCursor(0, 3);
-                lcd.print("                    ");
-                lcd.setCursor(0, 1);
-                lcd.print("                    ");
-                break;
-            default:
-                break;
-        }
+    // LCD Message
+    lcd.setCursor(0, 0);
+    lcd.print("SELECT MODE GAME");
+    // Select mode from keypad
+    if (keypad.isPressed())  ch = keypad.getChar();
+    switch (ch) {
+        case 'A':
+            lcd.setCursor(0, 1);
+            lcd.print("CONFIRM SELECTION?");
+            lcd.setCursor(0, 3);
+            lcd.print("MODE: A   DOMINATION");
+            selmode = MODE_A_DOMINATION;
+            break;
+        case 'B':
+            lcd.setCursor(0, 1);
+            lcd.print("CONFIRM SELECTION?");
+            lcd.setCursor(0, 3);
+            lcd.print("MODE: B    JOINT OP.");
+            selmode = MODE_B_JOINT;
+            break;
+        case 'C':
+            lcd.setCursor(0, 1);
+            lcd.print("CONFIRM SELECTION?");
+            lcd.setCursor(0, 3);
+            lcd.print("MODE: C      CLASSIC");
+            selmode = MODE_C_CLASSIC;
+            break;
+        case 'D':
+            lcd.setCursor(0, 1);
+            lcd.print("CONFIRM SELECTION?");
+            lcd.setCursor(0, 3);
+            lcd.print("MODE: D       POINTS");
+            selmode = MODE_D_POINTS;
+            break;
+        case '*':
+            // Next state
+            mode = MODE_SET_TIME;
+            // Reset 2nd line
+            lcd.setCursor(0, 1);
+            lcd.print("                    ");
+            // Reset lights
+            for (uint8_t i = 0; i < 5; i++) {
+                digitalWrite(ledB[i], LOW);
+                digitalWrite(ledY[i], LOW);
+            }
+            break;
+        case '#':
+            selmode = MODE_SELECT;
+            // Reset 2nd & 4th line
+            lcd.setCursor(0, 3);
+            lcd.print("                    ");
+            lcd.setCursor(0, 1);
+            lcd.print("                    ");
+            break;
+        default:
+            break;
     }
 }
 
-/******************************************************************************
-* FSM Functions
-*******************************************************************************/
 /*
- *  Start Loop Function
+ *  Set game time
  */
-void Start_Loop() {
-    // Blink
-    BlinkLED();
-    // Set mode
-    SetMode();
-}
-
-/*
- *  Mode A Loop Function (DOMINATION)
- */
-void Mode_A_Loop() {
-
-}
-
-/*
- *  Mode B Loop Function (JOINT)
- */
-void Mode_B_Loop() {
-
-}
-
-/*
- *  Mode C Loop Function (CLASSIC)
- */
-void Mode_C_Loop() {
-
-}
-
-/*
- *  Mode D Loop Function (POINTS)
- */
-void Mode_D_Loop() {
-
+void SetTime(void) {
+    char ch;
+    // LCD Message
+    lcd.setCursor(0, 0);
+    lcd.print("SET GAME TIME (min):");
 }
 
  /******************************************************************************
@@ -276,20 +239,20 @@ void setup() {
 void loop() {
     // Finite State Machine
     switch (mode) {
-        case MODE_START:
-            Start_Loop();
+        case MODE_SELECT:
+            BlinkLED();
+            SelectMode();
+            break;
+        case MODE_SET_TIME:
+            SetTime();
             break;
         case MODE_A_DOMINATION:
-            Mode_A_Loop();
             break;
         case MODE_B_JOINT:
-            Mode_B_Loop();
             break;
         case MODE_C_CLASSIC:
-            Mode_C_Loop();
             break;
         case MODE_D_POINTS:
-            Mode_D_Loop();
             break;
         default:
             break;
