@@ -87,6 +87,7 @@ bool keyRisingEdge = false;
 char ch;
 
 // Time variables
+char gameTime_str[4];
 uint16_t gameTime_min;
 
 
@@ -253,25 +254,20 @@ void SetTime(void) {
                 if ((x >= 0) && (x <= 2)) {
                     lcd.setCursor(x, 1);
                     lcd.print(ch);
-
+                    gameTime_str[x] = ch;
                     x++;
                 }
                 break;
             case '*':
-                if (x == 1) {
-                    //gameTime_min << timeCh[0];
-                }
                 lcd.setCursor(0, 2);
-                lcd.print(gameTime_min);
-                //else if (x == 2) {;}
-                //else if (x == 3) {;}
+                lcd.print(gameTime_str);
                 break;
             case '#':
                 if ((x >= 1) && (x <= 3)) {
                     x--;
                     lcd.setCursor(x, 1);
                     lcd.print("_");
-
+                    gameTime_str[x] = '\0';
                 }
                 break;
             default:
