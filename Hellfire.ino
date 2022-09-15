@@ -68,7 +68,7 @@ enum mode_e {
 *******************************************************************************/
 // Keypad map
 const char keymap[19] = "123A456B789C*0#DNF";  // N = NoKey, F = Fail
-// Led map
+// Led maps
 const byte ledB[5] = {GPIO_LED_B0, GPIO_LED_B1, GPIO_LED_B2, GPIO_LED_B3, GPIO_LED_B4};
 const byte ledY[5] = {GPIO_LED_Y0, GPIO_LED_Y1, GPIO_LED_Y2, GPIO_LED_Y3, GPIO_LED_Y4};
 
@@ -76,9 +76,19 @@ const byte ledY[5] = {GPIO_LED_Y0, GPIO_LED_Y1, GPIO_LED_Y2, GPIO_LED_Y3, GPIO_L
 LiquidCrystal_I2C lcd(I2C_ADR_LCD, 20, 4);   // I2C LCD 20x4 line display
 I2CKeyPad keypad(I2C_ADR_KEY);               // I2C Keypad (with PCF8574)
 
-// State variable
+// State variables
 mode_e mode = MODE_SELECT;
 mode_e selmode = MODE_SELECT;
+
+// Keypad variables
+bool keyCurrPress = false;
+bool keyLastPress = false;
+bool keyRisingEdge = false;
+char ch;
+
+// Time variables
+uint16_t gameTime_min;
+
 
 /******************************************************************************
 * Init Functions
@@ -116,6 +126,9 @@ void I2C_Init(void) {
 void LCD_Init(void) {
     lcd.init();
     lcd.backlight();
+    // LCD Start Message
+    lcd.setCursor(0, 0);
+    lcd.print("SELECT MODE GAME");
 }
 
 /*
@@ -129,6 +142,22 @@ void Keypad_Init(void) {
 /******************************************************************************
 * Generic Functions
 *******************************************************************************/
+/*
+ *  Function for key pression
+ */
+void KeyPress(void) {
+    // Check current state of key
+    keyCurrPress = keypad.isPressed();
+    // Rising edge
+    if (keyCurrPress && !keyLastPress) {
+        keyRisingEdge = true;
+        ch = keypad.getChar();
+    }
+    else keyRisingEdge = false;
+    // Previus state = current state
+    keyLastPress = keyCurrPress;
+}
+
 /*
  *  Blink LEDs
  */
@@ -149,63 +178,66 @@ void BlinkLED(void) {
  *  Start select mode
  */
 void SelectMode(void) {
-    char ch;
-    // LCD Message
-    lcd.setCursor(0, 0);
-    lcd.print("SELECT MODE GAME");
     // Select mode from keypad
-    if (keypad.isPressed())  ch = keypad.getChar();
-    switch (ch) {
-        case 'A':
-            lcd.setCursor(0, 1);
-            lcd.print("CONFIRM SELECTION?");
-            lcd.setCursor(0, 3);
-            lcd.print("MODE: A   DOMINATION");
-            selmode = MODE_A_DOMINATION;
-            break;
-        case 'B':
-            lcd.setCursor(0, 1);
-            lcd.print("CONFIRM SELECTION?");
-            lcd.setCursor(0, 3);
-            lcd.print("MODE: B    JOINT OP.");
-            selmode = MODE_B_JOINT;
-            break;
-        case 'C':
-            lcd.setCursor(0, 1);
-            lcd.print("CONFIRM SELECTION?");
-            lcd.setCursor(0, 3);
-            lcd.print("MODE: C      CLASSIC");
-            selmode = MODE_C_CLASSIC;
-            break;
-        case 'D':
-            lcd.setCursor(0, 1);
-            lcd.print("CONFIRM SELECTION?");
-            lcd.setCursor(0, 3);
-            lcd.print("MODE: D       POINTS");
-            selmode = MODE_D_POINTS;
-            break;
-        case '*':
-            // Next state
-            mode = MODE_SET_TIME;
-            // Reset 2nd line
-            lcd.setCursor(0, 1);
-            lcd.print("                    ");
-            // Reset lights
-            for (uint8_t i = 0; i < 5; i++) {
-                digitalWrite(ledB[i], LOW);
-                digitalWrite(ledY[i], LOW);
-            }
-            break;
-        case '#':
-            selmode = MODE_SELECT;
-            // Reset 2nd & 4th line
-            lcd.setCursor(0, 3);
-            lcd.print("                    ");
-            lcd.setCursor(0, 1);
-            lcd.print("                    ");
-            break;
-        default:
-            break;
+    if (keyRisingEdge) {
+        switch (ch) {
+            case 'A':
+                lcd.setCursor(0, 1);
+                lcd.print("CONFIRM SELECTION?");
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: A   DOMINATION");
+                selmode = MODE_A_DOMINATION;
+                break;
+            case 'B':
+                lcd.setCursor(0, 1);
+                lcd.print("CONFIRM SELECTION?");
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: B    JOINT OP.");
+                selmode = MODE_B_JOINT;
+                break;
+            case 'C':
+                lcd.setCursor(0, 1);
+                lcd.print("CONFIRM SELECTION?");
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: C      CLASSIC");
+                selmode = MODE_C_CLASSIC;
+                break;
+            case 'D':
+                lcd.setCursor(0, 1);
+                lcd.print("CONFIRM SELECTION?");
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: D       POINTS");
+                selmode = MODE_D_POINTS;
+                break;
+            case '*':
+                // Next state
+                mode = MODE_SET_TIME;
+                // LCD 1st line next message
+                lcd.setCursor(0, 0);
+                lcd.print("SET GAME TIME (min):");
+                // Reset 2nd line
+                lcd.setCursor(0, 1);
+                lcd.print("___                 ");
+                // Reset 3rd line
+                lcd.setCursor(0, 3);
+                lcd.print("                    ");
+                // Reset lights
+                for (uint8_t i = 0; i < 5; i++) {
+                    digitalWrite(ledB[i], LOW);
+                    digitalWrite(ledY[i], LOW);
+                }
+                break;
+            case '#':
+                selmode = MODE_SELECT;
+                // Reset 2nd & 4th line
+                lcd.setCursor(0, 1);
+                lcd.print("                    ");
+                lcd.setCursor(0, 3);
+                lcd.print("                    ");
+                break;
+            default:
+                break;
+        }
     }
 }
 
@@ -213,10 +245,39 @@ void SelectMode(void) {
  *  Set game time
  */
 void SetTime(void) {
-    char ch;
-    // LCD Message
-    lcd.setCursor(0, 0);
-    lcd.print("SET GAME TIME (min):");
+    static uint8_t x;
+    // Select game time in minutes from keypad
+    if (keyRisingEdge) {
+        switch (ch) {
+            case '0'...'9':
+                if ((x >= 0) && (x <= 2)) {
+                    lcd.setCursor(x, 1);
+                    lcd.print(ch);
+
+                    x++;
+                }
+                break;
+            case '*':
+                if (x == 1) {
+                    //gameTime_min << timeCh[0];
+                }
+                lcd.setCursor(0, 2);
+                lcd.print(gameTime_min);
+                //else if (x == 2) {;}
+                //else if (x == 3) {;}
+                break;
+            case '#':
+                if ((x >= 1) && (x <= 3)) {
+                    x--;
+                    lcd.setCursor(x, 1);
+                    lcd.print("_");
+
+                }
+                break;
+            default:
+                break;
+        }
+    }
 }
 
  /******************************************************************************
@@ -240,10 +301,12 @@ void loop() {
     // Finite State Machine
     switch (mode) {
         case MODE_SELECT:
+            KeyPress();
             BlinkLED();
             SelectMode();
             break;
         case MODE_SET_TIME:
+            KeyPress();
             SetTime();
             break;
         case MODE_A_DOMINATION:
