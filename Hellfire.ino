@@ -88,7 +88,7 @@ char ch;
 
 // Time variables
 char gameTime_str[4];
-uint16_t gameTime_min;
+int gameTime_min;
 
 
 /******************************************************************************
@@ -163,7 +163,7 @@ void KeyPress(void) {
  *  Blink LEDs
  */
 void BlinkLED(void) {
-    static uint8_t i;
+    static int i;
     if (i < 5)                       digitalWrite(ledB[i], HIGH);
     else if ((i >= 5) && (i < 10))   digitalWrite(ledY[i%5], HIGH);
     else if ((i >= 10) && (i < 15))  digitalWrite(ledB[i%5], LOW);
@@ -179,62 +179,83 @@ void BlinkLED(void) {
  *  Start select mode
  */
 void SelectMode(void) {
+    static bool confirmMode;
     // Select mode from keypad
     if (keyRisingEdge) {
         switch (ch) {
             case 'A':
-                lcd.setCursor(0, 1);
-                lcd.print("CONFIRM SELECTION?");
-                lcd.setCursor(0, 3);
-                lcd.print("MODE: A   DOMINATION");
-                selmode = MODE_A_DOMINATION;
+                if (!confirmMode) {
+                    lcd.setCursor(0, 1);
+                    lcd.print("CONFIRM SELECTION?");
+                    lcd.setCursor(0, 3);
+                    lcd.print("MODE: A   DOMINATION");
+                    selmode = MODE_A_DOMINATION;
+                    confirmMode = true;
+                }
                 break;
             case 'B':
-                lcd.setCursor(0, 1);
-                lcd.print("CONFIRM SELECTION?");
-                lcd.setCursor(0, 3);
-                lcd.print("MODE: B    JOINT OP.");
-                selmode = MODE_B_JOINT;
+                if (!confirmMode) {
+                    lcd.setCursor(0, 1);
+                    lcd.print("CONFIRM SELECTION?");
+                    lcd.setCursor(0, 3);
+                    lcd.print("MODE: B    JOINT OP.");
+                    selmode = MODE_B_JOINT;
+                    confirmMode = true;
+                }
                 break;
             case 'C':
-                lcd.setCursor(0, 1);
-                lcd.print("CONFIRM SELECTION?");
-                lcd.setCursor(0, 3);
-                lcd.print("MODE: C      CLASSIC");
-                selmode = MODE_C_CLASSIC;
+                if (!confirmMode) {
+                    lcd.setCursor(0, 1);
+                    lcd.print("CONFIRM SELECTION?");
+                    lcd.setCursor(0, 3);
+                    lcd.print("MODE: C      CLASSIC");
+                    selmode = MODE_C_CLASSIC;
+                    confirmMode = true;
+                }
                 break;
             case 'D':
-                lcd.setCursor(0, 1);
-                lcd.print("CONFIRM SELECTION?");
-                lcd.setCursor(0, 3);
-                lcd.print("MODE: D       POINTS");
-                selmode = MODE_D_POINTS;
+                if (!confirmMode) {
+                    lcd.setCursor(0, 1);
+                    lcd.print("CONFIRM SELECTION?");
+                    lcd.setCursor(0, 3);
+                    lcd.print("MODE: D       POINTS");
+                    selmode = MODE_D_POINTS;
+                    confirmMode = true;
+                }
                 break;
             case '*':
-                // Next state
-                mode = MODE_SET_TIME;
-                // LCD 1st line next message
-                lcd.setCursor(0, 0);
-                lcd.print("SET GAME TIME (min):");
-                // Reset 2nd line
-                lcd.setCursor(0, 1);
-                lcd.print("___                 ");
-                // Reset 3rd line
-                lcd.setCursor(0, 3);
-                lcd.print("                    ");
-                // Reset lights
-                for (uint8_t i = 0; i < 5; i++) {
-                    digitalWrite(ledB[i], LOW);
-                    digitalWrite(ledY[i], LOW);
+                if (confirmMode) {
+                    // Next state
+                    mode = MODE_SET_TIME;
+                    // LCD 1st line next message
+                    lcd.setCursor(0, 0);
+                    lcd.print("SET GAME TIME (min):");
+                    // Reset 2nd line
+                    lcd.setCursor(0, 1);
+                    lcd.print("           (max 999)");
+                    // Reset 3rd line
+                    lcd.setCursor(0, 3);
+                    lcd.print("                    ");
+                    // Blink cursor
+                    lcd.setCursor(0, 1);
+                    lcd.blink();
+                    // Reset lights
+                    for (uint8_t i = 0; i < 5; i++) {
+                        digitalWrite(ledB[i], LOW);
+                        digitalWrite(ledY[i], LOW);
+                    }
                 }
                 break;
             case '#':
-                selmode = MODE_SELECT;
-                // Reset 2nd & 4th line
-                lcd.setCursor(0, 1);
-                lcd.print("                    ");
-                lcd.setCursor(0, 3);
-                lcd.print("                    ");
+                if (confirmMode) {
+                    selmode = MODE_SELECT;
+                    // Reset 2nd & 4th line
+                    lcd.setCursor(0, 1);
+                    lcd.print("                    ");
+                    lcd.setCursor(0, 3);
+                    lcd.print("                    ");
+                    confirmMode = false;
+                }
                 break;
             default:
                 break;
@@ -246,12 +267,13 @@ void SelectMode(void) {
  *  Set game time
  */
 void SetTime(void) {
-    static uint8_t x;
+    static int x;
+    static bool confirmTime;
     // Select game time in minutes from keypad
     if (keyRisingEdge) {
         switch (ch) {
             case '0'...'9':
-                if ((x >= 0) && (x <= 2)) {
+                if ((!confirmTime) && (x >= 0) && (x <= 2)) {
                     lcd.setCursor(x, 1);
                     lcd.print(ch);
                     gameTime_str[x] = ch;
@@ -259,15 +281,37 @@ void SetTime(void) {
                 }
                 break;
             case '*':
-                lcd.setCursor(0, 2);
-                lcd.print(gameTime_str);
+                if ((!confirmTime) && (x > 0)) {
+                    gameTime_min = atoi(gameTime_str);
+                    lcd.noBlink();
+                    lcd.setCursor(0, 2);
+                    lcd.print("CONFIRM?            ");
+                    confirmTime = true;
+                }
+                else if (confirmTime) {
+                    lcd.clear();
+                }
                 break;
             case '#':
-                if ((x >= 1) && (x <= 3)) {
+                if ((!confirmTime) && (x >= 1) && (x <= 3)) {
                     x--;
                     lcd.setCursor(x, 1);
-                    lcd.print("_");
+                    lcd.print(" ");
+                    lcd.setCursor(x, 1);
                     gameTime_str[x] = '\0';
+                }
+                else if ((!confirmTime) && (x > 3)) {
+                    lcd.blink();
+                    confirmTime = false;
+                }
+                else if (confirmTime) {
+                    // Reset 3rd line
+                    lcd.setCursor(0, 2);
+                    lcd.print("                    ");
+                    // Blink cursor
+                    lcd.setCursor(x, 1);
+                    lcd.blink();
+                    confirmTime = false;
                 }
                 break;
             default:
