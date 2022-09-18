@@ -30,6 +30,7 @@
 *******************************************************************************/
 // Software Version
 #define SW_VERSION      0
+#define SW_REVISION     0
 
 // I2C Address
 #define I2C_ADR_KEY     0x20        // I2C Keypad Address (I2C Expansion PCF8574)
@@ -57,6 +58,8 @@
 enum mode_e {
     MODE_SELECT,
     MODE_SET_TIME,
+    MODE_SET_CODE,
+    MODE_START_GAME,
     MODE_A_DOMINATION,
     MODE_B_JOINT,
     MODE_C_CLASSIC,
@@ -78,7 +81,7 @@ I2CKeyPad keypad(I2C_ADR_KEY);               // I2C Keypad (with PCF8574)
 
 // State variables
 mode_e mode = MODE_SELECT;
-mode_e selmode = MODE_SELECT;
+mode_e selMode = MODE_SELECT;
 
 // Keypad variables
 bool keyCurrPress = false;
@@ -89,6 +92,10 @@ char ch;
 // Time variables
 char gameTime_str[4];
 int gameTime_min;
+char gameTimeCnt_str[9];
+int gameTimeCnt_h;
+int gameTimeCnt_m;
+int gameTimeCNt_s;
 
 
 /******************************************************************************
@@ -125,11 +132,15 @@ void I2C_Init(void) {
  *  LCD I2C Initialization
  */
 void LCD_Init(void) {
+    char version_str[8];
+    snprintf(version_str, 8, "v%d.%d", SW_VERSION, SW_REVISION);
     lcd.init();
     lcd.backlight();
     // LCD Start Message
     lcd.setCursor(0, 0);
     lcd.print("SELECT MODE GAME");
+    lcd.setCursor(0, 3);
+    lcd.print(version_str);
 }
 
 /*
@@ -189,7 +200,7 @@ void SelectMode(void) {
                     lcd.print("CONFIRM SELECTION?");
                     lcd.setCursor(0, 3);
                     lcd.print("MODE: A   DOMINATION");
-                    selmode = MODE_A_DOMINATION;
+                    selMode = MODE_A_DOMINATION;
                     confirmMode = true;
                 }
                 break;
@@ -199,7 +210,7 @@ void SelectMode(void) {
                     lcd.print("CONFIRM SELECTION?");
                     lcd.setCursor(0, 3);
                     lcd.print("MODE: B    JOINT OP.");
-                    selmode = MODE_B_JOINT;
+                    selMode = MODE_B_JOINT;
                     confirmMode = true;
                 }
                 break;
@@ -209,7 +220,7 @@ void SelectMode(void) {
                     lcd.print("CONFIRM SELECTION?");
                     lcd.setCursor(0, 3);
                     lcd.print("MODE: C      CLASSIC");
-                    selmode = MODE_C_CLASSIC;
+                    selMode = MODE_C_CLASSIC;
                     confirmMode = true;
                 }
                 break;
@@ -219,7 +230,7 @@ void SelectMode(void) {
                     lcd.print("CONFIRM SELECTION?");
                     lcd.setCursor(0, 3);
                     lcd.print("MODE: D       POINTS");
-                    selmode = MODE_D_POINTS;
+                    selMode = MODE_D_POINTS;
                     confirmMode = true;
                 }
                 break;
@@ -248,7 +259,7 @@ void SelectMode(void) {
                 break;
             case '#':
                 if (confirmMode) {
-                    selmode = MODE_SELECT;
+                    selMode = MODE_SELECT;
                     // Reset 2nd & 4th line
                     lcd.setCursor(0, 1);
                     lcd.print("                    ");
@@ -290,6 +301,23 @@ void SetTime(void) {
                 }
                 else if (confirmTime) {
                     lcd.clear();
+                    switch (selMode) {
+                        case MODE_A_DOMINATION:
+                            mode = MODE_START_GAME;
+                            lcd.setCursor(0, 0);
+                            lcd.print("PRESS * AND #       ");
+                            lcd.setCursor(0, 1);
+                            lcd.print("TO START THE GAME   ");
+                            break;
+                        case MODE_B_JOINT:
+                            break;
+                        case MODE_C_CLASSIC:
+                            break;
+                        case MODE_D_POINTS:
+                            break;
+                        default:
+                            break;
+                    }
                 }
                 break;
             case '#':
@@ -320,6 +348,43 @@ void SetTime(void) {
     }
 }
 
+/*
+ *  Function for double check of keys to start game
+ */
+void KeyStartGame(void) {
+    static bool astPressed;
+    static bool cancPressed;
+    static bool startCount;
+    // Check double press of * and #
+    ch = keypad.getChar();
+    switch (ch) {
+        case '*':
+            astPressed = true;
+            break;
+        case '#':
+            cancPressed = true;
+            break;
+        default:
+            break;
+    }
+    if(astPressed && cancPressed) startCount = true;
+    // Countdown to start
+    if(startCount) {
+        lcd.setCursor(0, 3);
+        lcd.print("3 ");
+        delay(1000);
+        lcd.print("2 ");
+        delay(1000);
+        lcd.print("1 ");
+        delay(1000);
+        mode = selMode;
+    }
+}
+
+/*
+ *  Count time
+ */
+
  /******************************************************************************
 * Main Arduino Functions (Setup + Loop)
 *******************************************************************************/
@@ -348,6 +413,11 @@ void loop() {
         case MODE_SET_TIME:
             KeyPress();
             SetTime();
+            break;
+        case MODE_SET_CODE:
+            break;
+        case MODE_START_GAME:
+            KeyStartGame();
             break;
         case MODE_A_DOMINATION:
             break;
