@@ -12,18 +12,21 @@
  * Description:
  * Bomb SW for SoftAir - Arduino UNO
  *
- *
- *
  * Version log:
- * 0.0: First draft - 17/07/2022
+ * 0.0: First draft
  */
 
 /******************************************************************************
 * Includes
 *******************************************************************************/
+// Public libraries
 #include "I2CKeyPad.h"              // I2C Keypad Library
 #include "LiquidCrystal_I2C.h"      // I2C LCD Screen Library
 #include "Wire.h"                   // I2C Library
+
+// Private libraries
+#include "LedBar.h"                 // Led Bar Library
+#include "TimeCount.h"              // Time Counter Library
 
 /******************************************************************************
 * Defines
@@ -71,13 +74,17 @@ enum mode_e {
 *******************************************************************************/
 // Keypad map
 const char keymap[19] = "123A456B789C*0#DNF";  // N = NoKey, F = Fail
+
 // Led maps
-const byte ledB[5] = {GPIO_LED_B0, GPIO_LED_B1, GPIO_LED_B2, GPIO_LED_B3, GPIO_LED_B4};
-const byte ledY[5] = {GPIO_LED_Y0, GPIO_LED_Y1, GPIO_LED_Y2, GPIO_LED_Y3, GPIO_LED_Y4};
+const byte BlueMap[5] = {GPIO_LED_B0, GPIO_LED_B1, GPIO_LED_B2, GPIO_LED_B3, GPIO_LED_B4};
+const byte YelMap[5] = {GPIO_LED_Y0, GPIO_LED_Y1, GPIO_LED_Y2, GPIO_LED_Y3, GPIO_LED_Y4};
 
 // Instances
 LiquidCrystal_I2C lcd(I2C_ADR_LCD, 20, 4);   // I2C LCD 20x4 line display
 I2CKeyPad keypad(I2C_ADR_KEY);               // I2C Keypad (with PCF8574)
+LedBar ledB(BlueMap, 5);                     // Blue LED bar
+LedBar ledY(YelMap, 5);                      // Yellow LED bar
+TimeCount GameTimer;                         // Timer of Game
 
 // State variables
 mode_e mode = MODE_SELECT;
@@ -86,60 +93,70 @@ mode_e selMode = MODE_SELECT;
 // Keypad variables
 bool keyCurrPress = false;
 bool keyLastPress = false;
-bool keyRisingEdge = false;
 char ch;
 
 // Time variables
 char gameTime_str[4];
-int gameTime_min;
-char gameTimeCnt_str[9];
-int gameTimeCnt_h;
-int gameTimeCnt_m;
-int gameTimeCNt_s;
+unsigned int gameTime_min;
 
+/******************************************************************************
+* Generic Functions
+*******************************************************************************/
+/*
+ *  Function for key pression rising edge
+ */
+bool KeyRising(void) {
+     bool keyRisingEdge;        // Return value = 1 when key is pressed
+
+     /* Keypad pression state */
+     keyCurrPress = keypad.isPressed();
+
+     /* Keypad rising edge */
+     if (keyCurrPress && !keyLastPress) {
+         keyRisingEdge = true;
+         ch = keypad.getChar();
+     }
+     else keyRisingEdge = false;
+
+     /* Update pression state */
+     keyLastPress = keyCurrPress;
+
+     /* Return value */
+     return keyRisingEdge;
+ }
 
 /******************************************************************************
 * Init Functions
 *******************************************************************************/
 /*
- *  GPIO Pin Initialization
- */
-void GPIO_Init(void) {
-    pinMode(GPIO_LED_B0, OUTPUT);
-    pinMode(GPIO_LED_B1, OUTPUT);
-    pinMode(GPIO_LED_B2, OUTPUT);
-    pinMode(GPIO_LED_B3, OUTPUT);
-    pinMode(GPIO_LED_B4, OUTPUT);
-    pinMode(GPIO_LED_Y0, OUTPUT);
-    pinMode(GPIO_LED_Y1, OUTPUT);
-    pinMode(GPIO_LED_Y2, OUTPUT);
-    pinMode(GPIO_LED_Y3, OUTPUT);
-    pinMode(GPIO_LED_Y4, OUTPUT);
-    pinMode(GPIO_BZR, OUTPUT);
-    pinMode(GPIO_SW_GRN, OUTPUT);
-    pinMode(GPIO_SW_RED, OUTPUT);
-}
-
-/*
  *  I2C Wire Initialization
  */
-void I2C_Init(void) {
-    Wire.begin();
-    Wire.setClock(100000);
-}
+ void I2C_Init(void) {
+
+     /* I2c begin */
+     Wire.begin();
+
+     /* I2c speed at 100k */
+     Wire.setClock(100000);
+ }
 
 /*
  *  LCD I2C Initialization
  */
 void LCD_Init(void) {
-    char version_str[8];
-    snprintf(version_str, 8, "v%d.%d", SW_VERSION, SW_REVISION);
+    char version_str[8];    // Current version string: (es: v1.2)
+
+    /* LCD display init */
     lcd.init();
+
+    /* Display backlight on */
     lcd.backlight();
-    // LCD Start Message
+
+    /* Display Start Message */
     lcd.setCursor(0, 0);
     lcd.print("SELECT MODE GAME");
     lcd.setCursor(0, 3);
+    snprintf(version_str, 8, "v%d.%d", SW_VERSION, SW_REVISION);
     lcd.print(version_str);
 }
 
@@ -147,52 +164,29 @@ void LCD_Init(void) {
  *  Keypad I2C Initialization
  */
 void Keypad_Init(void) {
+
+    /* Keypad begin */
     keypad.begin();
+
+    /* Keypad load key map */
     keypad.loadKeyMap(keymap);
 }
 
 /******************************************************************************
-* Generic Functions
+* Loop Functions
 *******************************************************************************/
 /*
- *  Function for key pression
+ *  Mode Select loop function
  */
-void KeyPress(void) {
-    // Check current state of key
-    keyCurrPress = keypad.isPressed();
-    // Rising edge
-    if (keyCurrPress && !keyLastPress) {
-        keyRisingEdge = true;
-        ch = keypad.getChar();
-    }
-    else keyRisingEdge = false;
-    // Previus state = current state
-    keyLastPress = keyCurrPress;
-}
+void ModeSelect_Loop(void) {
+    static bool confirmMode;        // 0-> select mode 1-> confirm selected mode
 
-/*
- *  Blink LEDs
- */
-void BlinkLED(void) {
-    static int i;
-    if (i < 5)                       digitalWrite(ledB[i], HIGH);
-    else if ((i >= 5) && (i < 10))   digitalWrite(ledY[i%5], HIGH);
-    else if ((i >= 10) && (i < 15))  digitalWrite(ledB[i%5], LOW);
-    else if ((i >= 15) && (i < 20))  digitalWrite(ledY[i%5], LOW);
-    //Check
-    i++;
-    if (i >= 20) i = 0;
-    //Delay
-    delay(50);
-}
+    /* Blink led bars */
+    ledB.Blink(50);     // Blink yellow led bar every 50 ms
+    ledY.Blink(50);     // Blink blue led bar every 50 ms
 
-/*
- *  Start select mode
- */
-void SelectMode(void) {
-    static bool confirmMode;
-    // Select mode from keypad
-    if (keyRisingEdge) {
+    /* Keypad */
+    if (KeyRising()) {
         switch (ch) {
             case 'A':
                 if (!confirmMode) {
@@ -251,10 +245,8 @@ void SelectMode(void) {
                     lcd.setCursor(0, 1);
                     lcd.blink();
                     // Reset lights
-                    for (uint8_t i = 0; i < 5; i++) {
-                        digitalWrite(ledB[i], LOW);
-                        digitalWrite(ledY[i], LOW);
-                    }
+                    ledB.Reset();
+                    ledY.Reset();
                 }
                 break;
             case '#':
@@ -275,13 +267,13 @@ void SelectMode(void) {
 }
 
 /*
- *  Set game time
+ *  Mode Set Time loop function
  */
-void SetTime(void) {
+void ModeSetTime_Loop(void) {
     static int x;
     static bool confirmTime;
     // Select game time in minutes from keypad
-    if (keyRisingEdge) {
+    if (KeyRising()) {
         switch (ch) {
             case '0'...'9':
                 if ((!confirmTime) && (x >= 0) && (x <= 2)) {
@@ -349,9 +341,15 @@ void SetTime(void) {
 }
 
 /*
- *  Function for double check of keys to start game
+ *  Mode Set Code loop function
  */
-void KeyStartGame(void) {
+void ModeSetCode_Loop(void) {
+}
+
+/*
+ *  Mode Start Game loop function
+ */
+void ModeStartGame_Loop(void) {
     static bool astPressed;
     static bool cancPressed;
     static bool startCount;
@@ -377,23 +375,67 @@ void KeyStartGame(void) {
         delay(1000);
         lcd.print("1 ");
         delay(1000);
+        GameTimer.SetTime(gameTime_min*60);
+        lcd.clear();
+        // Display still configuration
+        switch (selMode) {
+            case MODE_A_DOMINATION:
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: A   DOMINATION");
+                break;
+            case MODE_B_JOINT:
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: B    JOINT OP.");
+                break;
+            case MODE_C_CLASSIC:
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: C      CLASSIC");
+                break;
+            case MODE_D_POINTS:
+                lcd.setCursor(0, 3);
+                lcd.print("MODE: D       POINTS");
+                break;
+            default:
+                break;
+        }
+        // Start the game
         mode = selMode;
     }
 }
 
 /*
- *  Count time
+ *  Mode A: Domination
  */
+void ModeA_Loop(void) {
 
- /******************************************************************************
+}
+
+/*
+ *  Mode B: Joint Operation
+ */
+void ModeB_Loop(void) {
+}
+
+/*
+ *  Mode C: Classic
+ */
+void ModeC_Loop(void) {
+}
+
+/*
+ *  Mode D: Points Game
+ */
+void ModeD_Loop(void) {
+}
+
+/******************************************************************************
 * Main Arduino Functions (Setup + Loop)
 *******************************************************************************/
 /*
  *  Setup main function
  */
 void setup() {
-    // Init
-    GPIO_Init();
+    // Init functions
     I2C_Init();
     LCD_Init();
     Keypad_Init();
@@ -406,26 +448,28 @@ void loop() {
     // Finite State Machine
     switch (mode) {
         case MODE_SELECT:
-            KeyPress();
-            BlinkLED();
-            SelectMode();
+            ModeSelect_Loop();
             break;
         case MODE_SET_TIME:
-            KeyPress();
-            SetTime();
+            ModeSetTime_Loop();
             break;
         case MODE_SET_CODE:
+            ModeSetCode_Loop();
             break;
         case MODE_START_GAME:
-            KeyStartGame();
+            ModeStartGame_Loop();
             break;
         case MODE_A_DOMINATION:
+            ModeA_Loop();
             break;
         case MODE_B_JOINT:
+            ModeB_Loop();
             break;
         case MODE_C_CLASSIC:
+            ModeC_Loop();
             break;
         case MODE_D_POINTS:
+            ModeD_Loop();
             break;
         default:
             break;

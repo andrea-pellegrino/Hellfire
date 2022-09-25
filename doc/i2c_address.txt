@@ -1,0 +1,2 @@
+i2c expander: address = 0x20
+lcd : address = 0x27
