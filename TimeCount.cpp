@@ -7,22 +7,26 @@ TimeCount::TimeCount(void) {
 void TimeCount::SetTime(unsigned int _Time_s) {
     Time_s = _Time_s;
     Time_ms = millis();
+    Time_last_ms = millis();
+}
+
+bool TimeCount::Count(void) {
+    bool clock;
+    Time_ms = millis();
+    if ((Time_ms - Time_last_ms) >= 1000) {
+        Time_last_ms = Time_ms;
+        clock = true;
+    }
+    else clock = false;
+    return clock;
 }
 
 unsigned int TimeCount::Inc(void) {
-    Time_ms = millis();
-    if ((Time_ms - Time_last_ms) >= 1000) {
-        Time_s++;
-        Time_last_ms = Time_ms;
-    }
+    Time_s++;
     return Time_s;
 }
 unsigned int TimeCount::Dec(void) {
-    Time_ms = millis();
-    if (((Time_ms - Time_last_ms) >= 1000) && (Time_s > 0)) {
-        Time_s--;
-        Time_last_ms = Time_ms;
-    }
+    if (Time_s > 0) Time_s--;
     return Time_s;
 }
 

@@ -6,6 +6,7 @@
 class TimeCount {
     public:
         TimeCount(void);
+        bool Count(void);
         void SetTime(unsigned int);
         unsigned int Inc(void);
         unsigned int Dec(void);

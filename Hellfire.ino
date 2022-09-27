@@ -19,27 +19,27 @@
 /******************************************************************************
 * Includes
 *******************************************************************************/
-// Public libraries
+/* Public libraries */
 #include "I2CKeyPad.h"              // I2C Keypad Library
 #include "LiquidCrystal_I2C.h"      // I2C LCD Screen Library
 #include "Wire.h"                   // I2C Library
 
-// Private libraries
+/* Private libraries */
 #include "LedBar.h"                 // Led Bar Library
 #include "TimeCount.h"              // Time Counter Library
 
 /******************************************************************************
 * Defines
 *******************************************************************************/
-// Software Version
+/* Software Version */
 #define SW_VERSION      0
 #define SW_REVISION     0
 
-// I2C Address
+/* I2C Address */
 #define I2C_ADR_KEY     0x20        // I2C Keypad Address (I2C Expansion PCF8574)
 #define I2C_ADR_LCD     0x27        // I2C LCD Address
 
-// Pins Definition
+/* Pins Definition */
 #define GPIO_LED_B0     A3
 #define GPIO_LED_B1     A2
 #define GPIO_LED_B2     A1
@@ -57,7 +57,7 @@
 /******************************************************************************
 * Enumerations
 *******************************************************************************/
-// Game mode (main loop FSM)
+/* Game mode (main loop FSM) */
 enum mode_e {
     MODE_SELECT,
     MODE_SET_TIME,
@@ -72,30 +72,30 @@ enum mode_e {
 /******************************************************************************
 * Variables
 *******************************************************************************/
-// Keypad map
+/* Keypad map */
 const char keymap[19] = "123A456B789C*0#DNF";  // N = NoKey, F = Fail
 
-// Led maps
+/* Led maps */
 const byte BlueMap[5] = {GPIO_LED_B0, GPIO_LED_B1, GPIO_LED_B2, GPIO_LED_B3, GPIO_LED_B4};
 const byte YelMap[5] = {GPIO_LED_Y0, GPIO_LED_Y1, GPIO_LED_Y2, GPIO_LED_Y3, GPIO_LED_Y4};
 
-// Instances
+/* Instances */
 LiquidCrystal_I2C lcd(I2C_ADR_LCD, 20, 4);   // I2C LCD 20x4 line display
 I2CKeyPad keypad(I2C_ADR_KEY);               // I2C Keypad (with PCF8574)
 LedBar ledB(BlueMap, 5);                     // Blue LED bar
 LedBar ledY(YelMap, 5);                      // Yellow LED bar
 TimeCount GameTimer;                         // Timer of Game
 
-// State variables
+/* State variables */
 mode_e mode = MODE_SELECT;
 mode_e selMode = MODE_SELECT;
 
-// Keypad variables
+/* Keypad variables */
 bool keyCurrPress = false;
 bool keyLastPress = false;
 char ch;
 
-// Time variables
+/* Time variables */
 char gameTime_str[4];                       // Set digits (min)
 unsigned int gameTime_min;
 
@@ -458,7 +458,11 @@ void ModeStartGame_Loop(void) {
 
             case MODE_A_DOMINATION:                 // A
 
-                /* Display show current game */
+                /* Display show current game init */
+                lcd.setCursor(0, 2);
+                lcd.print("Countdown:");
+                lcd.setCursor(12, 2);
+                lcd.print(GameTimer.Str());
                 lcd.setCursor(0, 3);
                 lcd.print("MODE: A   DOMINATION");
                 break;
@@ -497,11 +501,11 @@ void ModeStartGame_Loop(void) {
  *  Mode A: Domination
  */
 void ModeA_Loop(void) {
-    GameTimer.Dec();
-    lcd.setCursor(0, 2);
-    lcd.print("Countdown:");
-    lcd.setCursor(12, 2);
-    lcd.print(GameTimer.Str());
+    if (GameTimer.Count()) {
+        GameTimer.Dec();
+        lcd.setCursor(12, 2);
+        lcd.print(GameTimer.Str());
+    }
 }
 
 /*
