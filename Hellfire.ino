@@ -96,7 +96,7 @@ bool keyLastPress = false;
 char ch;
 
 // Time variables
-char gameTime_str[4];
+char gameTime_str[4];                       // Set digits (min)
 unsigned int gameTime_min;
 
 /******************************************************************************
@@ -124,6 +124,8 @@ bool KeyRising(void) {
      /* Return value */
      return keyRisingEdge;
  }
+
+
 
 /******************************************************************************
 * Init Functions
@@ -186,80 +188,105 @@ void ModeSelect_Loop(void) {
     ledY.Blink(50);     // Blink blue led bar every 50 ms
 
     /* Keypad */
-    if (KeyRising()) {
+    if (KeyRising()) {      // When rising edge
         switch (ch) {
             case 'A':
-                if (!confirmMode) {
+                if (!confirmMode) {     // Select mode A
+
+                    /* Display confirm selection */
                     lcd.setCursor(0, 1);
                     lcd.print("CONFIRM SELECTION?");
                     lcd.setCursor(0, 3);
                     lcd.print("MODE: A   DOMINATION");
+
+                    /* Next mode */
                     selMode = MODE_A_DOMINATION;
                     confirmMode = true;
                 }
                 break;
+
             case 'B':
-                if (!confirmMode) {
+                if (!confirmMode) {     // Select mode B
+
+                    /* Display confirm selection */
                     lcd.setCursor(0, 1);
                     lcd.print("CONFIRM SELECTION?");
                     lcd.setCursor(0, 3);
                     lcd.print("MODE: B    JOINT OP.");
+
+                    /* Next mode */
                     selMode = MODE_B_JOINT;
                     confirmMode = true;
                 }
                 break;
+
             case 'C':
-                if (!confirmMode) {
+                if (!confirmMode) {     // Select mode C
+
+                    /* Display confirm selection */
                     lcd.setCursor(0, 1);
                     lcd.print("CONFIRM SELECTION?");
                     lcd.setCursor(0, 3);
                     lcd.print("MODE: C      CLASSIC");
+
+                    /* Next mode */
                     selMode = MODE_C_CLASSIC;
                     confirmMode = true;
                 }
                 break;
+
             case 'D':
-                if (!confirmMode) {
+                if (!confirmMode) {     // Select mode D
+
+                    /* Display confirm selection */
                     lcd.setCursor(0, 1);
                     lcd.print("CONFIRM SELECTION?");
                     lcd.setCursor(0, 3);
                     lcd.print("MODE: D       POINTS");
+
+                    /* Next mode */
                     selMode = MODE_D_POINTS;
                     confirmMode = true;
                 }
                 break;
+
             case '*':
-                if (confirmMode) {
-                    // Next state
-                    mode = MODE_SET_TIME;
-                    // LCD 1st line next message
+                if (confirmMode) {      // Confirm selected mode
+
+                    /* Display set game time */
                     lcd.setCursor(0, 0);
                     lcd.print("SET GAME TIME (min):");
-                    // Reset 2nd line
                     lcd.setCursor(0, 1);
                     lcd.print("           (max 999)");
-                    // Reset 3rd line
                     lcd.setCursor(0, 3);
                     lcd.print("                    ");
-                    // Blink cursor
                     lcd.setCursor(0, 1);
                     lcd.blink();
-                    // Reset lights
+
+                    /* Reset bar lights */
                     ledB.Reset();
                     ledY.Reset();
+
+                    /* Next mode */
+                    mode = MODE_SET_TIME;       // Next state
                 }
                 break;
-            case '#':
+
+            case '#':                   // Cancel selected mode
                 if (confirmMode) {
-                    selMode = MODE_SELECT;
-                    // Reset 2nd & 4th line
+
+                    /* Display reset selected mode */
                     lcd.setCursor(0, 1);
                     lcd.print("                    ");
                     lcd.setCursor(0, 3);
                     lcd.print("                    ");
+
+                    /* Next mode */
                     confirmMode = false;
+                    selMode = MODE_SELECT;      // Reset selected mode
                 }
                 break;
+
             default:
                 break;
         }
@@ -270,70 +297,108 @@ void ModeSelect_Loop(void) {
  *  Mode Set Time loop function
  */
 void ModeSetTime_Loop(void) {
-    static int x;
-    static bool confirmTime;
-    // Select game time in minutes from keypad
-    if (KeyRising()) {
+    static int x;                // cursor position
+    static bool confirmTime;     // 0-> set time 1-> confirm time
+
+    /* Keypad */
+    if (KeyRising()) {      // When rising edge
         switch (ch) {
             case '0'...'9':
+
+                /* Write ditigs (max 3 digits) */
                 if ((!confirmTime) && (x >= 0) && (x <= 2)) {
+
+                    /* Display print digit */
                     lcd.setCursor(x, 1);
                     lcd.print(ch);
+
+                    /* Save digit into string */
                     gameTime_str[x] = ch;
                     x++;
                 }
                 break;
+
             case '*':
+
+                /* Set time */
                 if ((!confirmTime) && (x > 0)) {
+
+                    /* Convert digits string into int */
                     gameTime_min = atoi(gameTime_str);
+
+                    /* Display confirm time*/
                     lcd.noBlink();
                     lcd.setCursor(0, 2);
                     lcd.print("CONFIRM?            ");
+
+                    /* Next mode */
                     confirmTime = true;
                 }
+                /* Confirm time */
                 else if (confirmTime) {
+
+                    /* Reset display */
                     lcd.clear();
+
+                    /* Go to selected game */
                     switch (selMode) {
-                        case MODE_A_DOMINATION:
-                            mode = MODE_START_GAME;
+
+                        case MODE_A_DOMINATION:                 // Game A
+
+                            /* Start game */
                             lcd.setCursor(0, 0);
                             lcd.print("PRESS * AND #       ");
                             lcd.setCursor(0, 1);
                             lcd.print("TO START THE GAME   ");
+
+                            /* Next mode (go to start game, no code is needed) */
+                            mode = MODE_START_GAME;
                             break;
-                        case MODE_B_JOINT:
+
+                        case MODE_B_JOINT:                      // Game B
                             break;
-                        case MODE_C_CLASSIC:
+
+                        case MODE_C_CLASSIC:                    // Game C
                             break;
-                        case MODE_D_POINTS:
+
+                        case MODE_D_POINTS:                     // Game D
                             break;
+
                         default:
                             break;
                     }
                 }
                 break;
+
             case '#':
+
+                /* Delete ditigs (max 3 digits) */
                 if ((!confirmTime) && (x >= 1) && (x <= 3)) {
+
+                    /* Display remove digit */
                     x--;
                     lcd.setCursor(x, 1);
                     lcd.print(" ");
                     lcd.setCursor(x, 1);
+
+                    /* Remove digit from string */
                     gameTime_str[x] = '\0';
                 }
-                else if ((!confirmTime) && (x > 3)) {
-                    lcd.blink();
-                    confirmTime = false;
-                }
+
+                /* Do not confirm time set */
                 else if (confirmTime) {
-                    // Reset 3rd line
+
+                    /* D */
                     lcd.setCursor(0, 2);
                     lcd.print("                    ");
-                    // Blink cursor
                     lcd.setCursor(x, 1);
                     lcd.blink();
+
+                    /* Next mode */
                     confirmTime = false;
                 }
                 break;
+
             default:
                 break;
         }
@@ -353,21 +418,29 @@ void ModeStartGame_Loop(void) {
     static bool astPressed;
     static bool cancPressed;
     static bool startCount;
-    // Check double press of * and #
+
+    /* Keypad */
     ch = keypad.getChar();
-    switch (ch) {
+    switch (ch) {           // Check double press of * and #
         case '*':
             astPressed = true;
             break;
+
         case '#':
             cancPressed = true;
             break;
+
         default:
             break;
     }
+
+    /* Start countdown trigger */
     if(astPressed && cancPressed) startCount = true;
-    // Countdown to start
+
+    /* Countdown */
     if(startCount) {
+
+        /* Display show countdown */
         lcd.setCursor(0, 3);
         lcd.print("3 ");
         delay(1000);
@@ -375,30 +448,47 @@ void ModeStartGame_Loop(void) {
         delay(1000);
         lcd.print("1 ");
         delay(1000);
-        GameTimer.SetTime(gameTime_min*60);
         lcd.clear();
-        // Display still configuration
+
+        /* Set game time counter */
+        GameTimer.SetTime(gameTime_min*60);
+
+        /* Display still configuration */
         switch (selMode) {
-            case MODE_A_DOMINATION:
+
+            case MODE_A_DOMINATION:                 // A
+
+                /* Display show current game */
                 lcd.setCursor(0, 3);
                 lcd.print("MODE: A   DOMINATION");
                 break;
-            case MODE_B_JOINT:
+
+            case MODE_B_JOINT:                      // B
+
+                /* Display show current game */
                 lcd.setCursor(0, 3);
                 lcd.print("MODE: B    JOINT OP.");
                 break;
-            case MODE_C_CLASSIC:
+
+            case MODE_C_CLASSIC:                    // C
+
+                /* Display show current game */
                 lcd.setCursor(0, 3);
                 lcd.print("MODE: C      CLASSIC");
                 break;
-            case MODE_D_POINTS:
+
+            case MODE_D_POINTS:                     // D
+
+                /* Display show current game */
                 lcd.setCursor(0, 3);
                 lcd.print("MODE: D       POINTS");
                 break;
+
             default:
                 break;
         }
-        // Start the game
+
+        /* Next mode (start the game) */
         mode = selMode;
     }
 }
@@ -407,7 +497,11 @@ void ModeStartGame_Loop(void) {
  *  Mode A: Domination
  */
 void ModeA_Loop(void) {
-
+    GameTimer.Dec();
+    lcd.setCursor(0, 2);
+    lcd.print("Countdown:");
+    lcd.setCursor(12, 2);
+    lcd.print(GameTimer.Str());
 }
 
 /*
@@ -435,9 +529,14 @@ void ModeD_Loop(void) {
  *  Setup main function
  */
 void setup() {
-    // Init functions
+
+    /* I2c init */
     I2C_Init();
+
+    /* Liquidcrystal I2C init */
     LCD_Init();
+
+    /* Keypad I2C with PCF8574 init */
     Keypad_Init();
 }
 
@@ -445,32 +544,42 @@ void setup() {
  *  Loop main function
  */
 void loop() {
-    // Finite State Machine
+
+    /* Mode Finite State Machine */
     switch (mode) {
-        case MODE_SELECT:
+
+        case MODE_SELECT:           // Select mode
             ModeSelect_Loop();
             break;
-        case MODE_SET_TIME:
+
+        case MODE_SET_TIME:         // Set game time
             ModeSetTime_Loop();
             break;
-        case MODE_SET_CODE:
+
+        case MODE_SET_CODE:         // Set code for unlock
             ModeSetCode_Loop();
             break;
-        case MODE_START_GAME:
+
+        case MODE_START_GAME:       // Start the game
             ModeStartGame_Loop();
             break;
-        case MODE_A_DOMINATION:
+
+        case MODE_A_DOMINATION:     // GAME MODE: A
             ModeA_Loop();
             break;
-        case MODE_B_JOINT:
+
+        case MODE_B_JOINT:          // GAME MODE: B
             ModeB_Loop();
             break;
-        case MODE_C_CLASSIC:
+
+        case MODE_C_CLASSIC:        // GAME MODE: C
             ModeC_Loop();
             break;
-        case MODE_D_POINTS:
+
+        case MODE_D_POINTS:         // GAME MODE: D
             ModeD_Loop();
             break;
+
         default:
             break;
     }
