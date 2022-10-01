@@ -6,10 +6,10 @@
 class LedBar {
     public:
         LedBar(byte*, int);
-        bool Inc(void);
-        bool Dec(void);
-        void Blink(int);
-        void Reset(void);
+        bool inc(void);
+        bool dec(void);
+        void blink(int);
+        void reset(void);
     private:
         unsigned long StartTime;
         unsigned long CurrTime;

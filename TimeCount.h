@@ -6,11 +6,11 @@
 class TimeCount {
     public:
         TimeCount(void);
-        bool Count(void);
-        void SetTime(unsigned int);
-        unsigned int Inc(void);
-        unsigned int Dec(void);
-        char* Str(void);
+        bool count(void);
+        void setTime(unsigned int);
+        unsigned int inc(void);
+        unsigned int dec(void);
+        char* str(void);
     private:
         unsigned int Time_s;
         unsigned long Time_ms;

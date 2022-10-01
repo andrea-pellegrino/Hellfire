@@ -20,12 +20,14 @@
 * Includes
 *******************************************************************************/
 /* Public libraries */
+#include "Buzzer.h"                 // Buzzer Library
 #include "I2CKeyPad.h"              // I2C Keypad Library
 #include "LiquidCrystal_I2C.h"      // I2C LCD Screen Library
 #include "Wire.h"                   // I2C Library
 
 /* Private libraries */
 #include "LedBar.h"                 // Led Bar Library
+#include "PushButton.h"             // Pushbutton Library
 #include "TimeCount.h"              // Time Counter Library
 
 /******************************************************************************
@@ -76,15 +78,18 @@ enum mode_e {
 const char keymap[19] = "123A456B789C*0#DNF";  // N = NoKey, F = Fail
 
 /* Led maps */
-const byte BlueMap[5] = {GPIO_LED_B0, GPIO_LED_B1, GPIO_LED_B2, GPIO_LED_B3, GPIO_LED_B4};
-const byte YelMap[5] = {GPIO_LED_Y0, GPIO_LED_Y1, GPIO_LED_Y2, GPIO_LED_Y3, GPIO_LED_Y4};
+const byte ledMapT1[5] = {GPIO_LED_B0, GPIO_LED_B1, GPIO_LED_B2, GPIO_LED_B3, GPIO_LED_B4};
+const byte ledMapT2[5] = {GPIO_LED_Y0, GPIO_LED_Y1, GPIO_LED_Y2, GPIO_LED_Y3, GPIO_LED_Y4};
 
 /* Instances */
-LiquidCrystal_I2C lcd(I2C_ADR_LCD, 20, 4);   // I2C LCD 20x4 line display
-I2CKeyPad keypad(I2C_ADR_KEY);               // I2C Keypad (with PCF8574)
-LedBar ledB(BlueMap, 5);                     // Blue LED bar
-LedBar ledY(YelMap, 5);                      // Yellow LED bar
-TimeCount GameTimer;                         // Timer of Game
+LiquidCrystal_I2C lcd(I2C_ADR_LCD, 20, 4);  // I2C LCD 20x4 line display
+I2CKeyPad keypad(I2C_ADR_KEY);              // I2C Keypad (with PCF8574)
+LedBar ledT1(ledMapT1, 5);                  // Blue LED bar (team 1)
+LedBar ledT2(ledMapT2, 5);                  // Yellow LED bar (team 2)
+TimeCount GameTimer;                        // Timer of Game
+PushButton swT1(GPIO_SW_RED);               // Red button (team 1)
+PushButton swT2(GPIO_SW_GRN);               // Green button (team 2)
+Buzzer buzzer(GPIO_BZR);                    // Buzzer
 
 /* State variables */
 mode_e mode = MODE_SELECT;
@@ -174,6 +179,19 @@ void Keypad_Init(void) {
     keypad.loadKeyMap(keymap);
 }
 
+/*
+ *  GPIO Initialization
+ */
+void GPIO_Init(void) {
+
+    /* Switch begin */
+    //swT1.begin();       // Red button
+    //swT2.begin();       // Green button
+
+    /* Buzzer init */
+    buzzer.begin(10);
+}
+
 /******************************************************************************
 * Loop Functions
 *******************************************************************************/
@@ -184,8 +202,8 @@ void ModeSelect_Loop(void) {
     static bool confirmMode;        // 0-> select mode 1-> confirm selected mode
 
     /* Blink led bars */
-    ledB.Blink(50);     // Blink yellow led bar every 50 ms
-    ledY.Blink(50);     // Blink blue led bar every 50 ms
+    ledT1.blink(50);     // Blink (t1) blue led bar every 50 ms
+    ledT2.blink(50);     // Blink (t2) yellow led bar every 50 ms
 
     /* Keypad */
     if (KeyRising()) {      // When rising edge
@@ -264,8 +282,8 @@ void ModeSelect_Loop(void) {
                     lcd.blink();
 
                     /* Reset bar lights */
-                    ledB.Reset();
-                    ledY.Reset();
+                    ledT1.reset();
+                    ledT2.reset();
 
                     /* Next mode */
                     mode = MODE_SET_TIME;       // Next state
@@ -451,7 +469,7 @@ void ModeStartGame_Loop(void) {
         lcd.clear();
 
         /* Set game time counter */
-        GameTimer.SetTime(gameTime_min*60);
+        GameTimer.setTime(gameTime_min*60);
 
         /* Display still configuration */
         switch (selMode) {
@@ -462,7 +480,7 @@ void ModeStartGame_Loop(void) {
                 lcd.setCursor(0, 2);
                 lcd.print("Countdown:");
                 lcd.setCursor(12, 2);
-                lcd.print(GameTimer.Str());
+                lcd.print(GameTimer.str());
                 lcd.setCursor(0, 3);
                 lcd.print("MODE: A   DOMINATION");
                 break;
@@ -501,11 +519,17 @@ void ModeStartGame_Loop(void) {
  *  Mode A: Domination
  */
 void ModeA_Loop(void) {
-    if (GameTimer.Count()) {
-        GameTimer.Dec();
+
+    if (GameTimer.count()) {
+        GameTimer.dec();
         lcd.setCursor(12, 2);
-        lcd.print(GameTimer.Str());
+        lcd.print(GameTimer.str());
     }
+    if(swT1.isPressed()) ledT1.inc();
+    else ledT1.dec();
+    if(swT2.isPressed()) ledT2.inc();
+    else ledT2.dec();
+
 }
 
 /*
@@ -542,6 +566,9 @@ void setup() {
 
     /* Keypad I2C with PCF8574 init */
     Keypad_Init();
+
+    /* GPIO init (Switch - Buzzer) */
+    GPIO_Init();
 }
 
 /*
@@ -587,6 +614,8 @@ void loop() {
         default:
             break;
     }
+
+
 }
 
 /* EOF */

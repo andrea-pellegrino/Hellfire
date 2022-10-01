@@ -9,7 +9,7 @@ LedBar::LedBar(byte* pinArray, int Num) {
         isUp = true;
 }
 
-bool LedBar::Inc(void) {
+bool LedBar::inc(void) {
     bool err;
     if ((State >= 0) && (State < Size)) {
         digitalWrite(*(Array+State), HIGH);
@@ -20,7 +20,7 @@ bool LedBar::Inc(void) {
     return err;
 }
 
-bool LedBar::Dec(void) {
+bool LedBar::dec(void) {
     bool err;
     if ((State > 0) && (State <= Size)) {
         State--;
@@ -31,20 +31,20 @@ bool LedBar::Dec(void) {
     return err;
 }
 
-void LedBar::Blink(int Period_ms) {
+void LedBar::blink(int Period_ms) {
     CurrTime = millis();
     if ((CurrTime - StartTime) >= Period_ms) {
         if (isUp) {
-            if (Inc()) isUp = false;
+            if (inc()) isUp = false;
         }
         else {
-            if (Dec()) isUp = true;
+            if (dec()) isUp = true;
         }
         StartTime = CurrTime;
     }
 }
 
-void LedBar::Reset(void) {
+void LedBar::reset(void) {
     int i;
     for (i=0; i<Size; i++) digitalWrite(*(Array+i), LOW);
     State = 0;
