@@ -10,7 +10,7 @@ class LedBar {
         bool dec(void);
         void blink(int);
         void reset(void);
-        void set(int);
+        void full(void);
     private:
         unsigned long StartTime;
         unsigned long CurrTime;

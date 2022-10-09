@@ -50,11 +50,8 @@ void LedBar::reset(void) {
     State = 0;
 }
 
-void LedBar::set(int Val) {
+void LedBar::full(void) {
     int i;
-    int limit;
-    if (Val >= Size) limit = Size;
-    else limit = Val;
-    for (i=0; i<limit; i++) digitalWrite(*(Array+i), HIGH);
-    State = Val;
+    for (i=0; i<Size; i++) digitalWrite(*(Array+i), HIGH);
+    State = Size;
 }
