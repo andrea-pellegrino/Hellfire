@@ -128,6 +128,12 @@ unsigned int t1Time_s;
 unsigned int t2Time_s;
 unsigned int gameTime_s;
 
+/* Code */
+char codeT1_str[6];
+char codeT2_str[6];
+long codeT1_uint;
+long codeT2_uint;
+
 /******************************************************************************
 * Generic Functions
 *******************************************************************************/
@@ -153,8 +159,6 @@ bool KeyRising(void) {
      /* Return value */
      return keyRisingEdge;
  }
-
-
 
 /******************************************************************************
 * Init Functions
@@ -389,6 +393,15 @@ void ModeSetTime_Loop(void) {
                             break;
 
                         case MODE_B_JOINT:                      // Game B
+
+                            /* Display set game time */
+                            lcd.setCursor(0, 0);
+                            lcd.print("SET CODE TEAM 1:    ");
+                            lcd.setCursor(0, 1);
+                            lcd.print("          (5 digits)");
+
+                            /* Next mode */
+                            mode = MODE_SET_CODE;
                             break;
 
                         case MODE_C_CLASSIC:                    // Game C
@@ -442,6 +455,122 @@ void ModeSetTime_Loop(void) {
  *  Mode Set Code loop function
  */
 void ModeSetCode_Loop(void) {
+    static int x;                // cursor position
+    static bool fTeam;           // 0-> team 1   1-> team 2
+
+    /* Keypad */
+    if (KeyRising()) {      // When rising edge
+        switch (ch) {
+            case '0'...'9':
+
+                /* Write ditigs (max 5 digits) */
+                if ((x >= 0) && (x <= 4)) {
+
+                    /* Display print digit */
+                    lcd.setCursor(x, 1);
+                    lcd.print(ch);
+
+                    /* Save digit into string */
+                    if(!fTeam) codeT1_str[x] = ch;
+                    else codeT2_str[x] = ch;
+                    x++;
+
+                    if (x == 5) {
+
+                        /* Display confirm code*/
+                        lcd.noBlink();
+                        lcd.setCursor(0, 2);
+                        lcd.print("CONFIRM?            ");
+                    }                    /* Reset display */
+                }
+                break;
+
+            case '*':
+
+                if (x == 5) {
+
+                    /* Convert digits string into int */
+                    if(!fTeam) codeT1_uint = atol(codeT1_str);
+                    else codeT2_uint = atol(codeT2_str);
+
+                    /* Go to selected game */
+                    switch (selMode) {
+
+                        case MODE_A_DOMINATION:                 // Game A
+                            break;
+
+                        case MODE_B_JOINT:                      // Game B
+
+                            if(!fTeam) {
+
+                                /* Display set game time */
+                                lcd.setCursor(0, 0);
+                                lcd.print("SET CODE TEAM 2:    ");
+                                lcd.setCursor(0, 1);
+                                lcd.print("          (5 digits)");
+                                lcd.setCursor(0, 2);
+                                lcd.print("                    ");
+                                lcd.setCursor(0, 1);
+                                lcd.blink();
+                                x = 0;      // Reset cursor
+
+                                /* Set second code */
+                                fTeam = true;
+
+                            }
+                            else {
+
+                                /* Reset display */
+                                lcd.clear();
+
+                                /* Start game */
+                                lcd.setCursor(0, 0);
+                                lcd.print("PRESS * AND #       ");
+                                lcd.setCursor(0, 1);
+                                lcd.print("TO START THE GAME   ");
+
+                                /* Next mode (go to start game) */
+                                mode = MODE_START_GAME;
+                            }
+                            break;
+
+                        case MODE_C_CLASSIC:                    // Game C
+                            break;
+
+                        case MODE_D_POINTS:                     // Game D
+                            break;
+
+                        default:
+                            break;
+                    }
+                }
+                break;
+
+            case '#':
+
+                /* Delete ditigs (max 5 digits) */
+                if ((x >= 1) && (x <= 5)) {
+
+                    /* Reset Confirm */
+                    lcd.setCursor(0, 2);
+                    lcd.print("                    ");
+
+                    /* Display remove digit */
+                    x--;
+                    lcd.setCursor(x, 1);
+                    lcd.print(" ");
+                    lcd.setCursor(x, 1);
+
+                    /* Remove digit from string */
+                    if(!fTeam) codeT1_str[x] = '\0';
+                    else codeT2_str[x]= '\0';
+                }
+                break;
+
+            default:
+                break;
+        }
+    }
 }
 
 /*
@@ -487,6 +616,7 @@ void ModeStartGame_Loop(void) {
         gameTim.setTime(gameTime_min*60);
         t1Tim.setTime(t1Time_s);
         t2Tim.setTime(t2Time_s);
+
 
         /* Display still configuration */
         switch (selMode) {
@@ -672,6 +802,7 @@ void ModeA_Loop(void) {
             break;
 
         case ADV_T2_T1PRESS:
+
             /* T2 Timer is increasing */
             if (t2Tim.count()) {
                 t2Time_s = t2Tim.inc();
