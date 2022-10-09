@@ -20,6 +20,7 @@
 * Includes
 *******************************************************************************/
 /* Public libraries */
+#include "Button.h"                 // Button Library
 #include "Buzzer.h"                 // Buzzer Library
 #include "I2CKeyPad.h"              // I2C Keypad Library
 #include "LiquidCrystal_I2C.h"      // I2C LCD Screen Library
@@ -27,7 +28,6 @@
 
 /* Private libraries */
 #include "LedBar.h"                 // Led Bar Library
-#include "PushButton.h"             // Pushbutton Library
 #include "TimeCount.h"              // Time Counter Library
 
 /******************************************************************************
@@ -71,6 +71,17 @@ enum mode_e {
     MODE_D_POINTS
 };
 
+/* Game advantage */
+enum adv_e {
+    ADV_NONE_NOPRESS,
+    ADV_NONE_T1PRESS,
+    ADV_NONE_T2PRESS,
+    ADV_T1_NOPRESS,
+    ADV_T1_T2PRESS,
+    ADV_T2_NOPRESS,
+    ADV_T2_T1PRESS,
+};
+
 /******************************************************************************
 * Variables
 *******************************************************************************/
@@ -86,23 +97,34 @@ LiquidCrystal_I2C lcd(I2C_ADR_LCD, 20, 4);  // I2C LCD 20x4 line display
 I2CKeyPad keypad(I2C_ADR_KEY);              // I2C Keypad (with PCF8574)
 LedBar ledT1(ledMapT1, 5);                  // Blue LED bar (team 1)
 LedBar ledT2(ledMapT2, 5);                  // Yellow LED bar (team 2)
-TimeCount GameTimer;                        // Timer of Game
-PushButton swT1(GPIO_SW_RED);               // Red button (team 1)
-PushButton swT2(GPIO_SW_GRN);               // Green button (team 2)
+TimeCount gameTim;                          // Timer of Game
+TimeCount swT1Tim;                          // Timer of red button (team 1)
+TimeCount swT2Tim;                          // Timer of green button (team 2)
+TimeCount t1Tim;                            // Game timer of team 1
+TimeCount t2Tim;                            // Game timer of team 2
+Button swT1(GPIO_SW_RED);                   // Red button (team 1)
+Button swT2(GPIO_SW_GRN);                   // Green button (team 2)
 Buzzer buzzer(GPIO_BZR);                    // Buzzer
 
 /* State variables */
 mode_e mode = MODE_SELECT;
 mode_e selMode = MODE_SELECT;
+adv_e adv = ADV_NONE_NOPRESS;
 
 /* Keypad variables */
 bool keyCurrPress = false;
 bool keyLastPress = false;
 char ch;
 
+/* Ledbar variables */
+int ledT1State;
+int ledT2State;
+
 /* Time variables */
 char gameTime_str[4];                       // Set digits (min)
 unsigned int gameTime_min;
+unsigned int t1Time_s;
+unsigned int t2Time_s;
 
 /******************************************************************************
 * Generic Functions
@@ -177,19 +199,10 @@ void Keypad_Init(void) {
 
     /* Keypad load key map */
     keypad.loadKeyMap(keymap);
-}
 
-/*
- *  GPIO Initialization
- */
-void GPIO_Init(void) {
-
-    /* Switch begin */
-    //swT1.begin();       // Red button
-    //swT2.begin();       // Green button
-
-    /* Buzzer init */
-    buzzer.begin(10);
+    /* Button begin */
+    swT1.begin();
+    swT2.begin();
 }
 
 /******************************************************************************
@@ -468,8 +481,10 @@ void ModeStartGame_Loop(void) {
         delay(1000);
         lcd.clear();
 
-        /* Set game time counter */
-        GameTimer.setTime(gameTime_min*60);
+        /* Set time counters */
+        gameTim.setTime(gameTime_min*60);
+        t1Tim.setTime(t1Time_s);
+        t2Tim.setTime(t2Time_s);
 
         /* Display still configuration */
         switch (selMode) {
@@ -477,10 +492,18 @@ void ModeStartGame_Loop(void) {
             case MODE_A_DOMINATION:                 // A
 
                 /* Display show current game init */
+                lcd.setCursor(0, 0);
+                lcd.print("Team 1:");
+                lcd.setCursor(12, 0);
+                lcd.print(t1Tim.str());
+                lcd.setCursor(0, 1);
+                lcd.print("Team 2:");
+                lcd.setCursor(12, 1);
+                lcd.print(t2Tim.str());
                 lcd.setCursor(0, 2);
                 lcd.print("Countdown:");
                 lcd.setCursor(12, 2);
-                lcd.print(GameTimer.str());
+                lcd.print(gameTim.str());
                 lcd.setCursor(0, 3);
                 lcd.print("MODE: A   DOMINATION");
                 break;
@@ -520,16 +543,95 @@ void ModeStartGame_Loop(void) {
  */
 void ModeA_Loop(void) {
 
-    if (GameTimer.count()) {
-        GameTimer.dec();
+    /* Game time counter */
+    if (gameTim.count()) {
+        gameTim.dec();
         lcd.setCursor(12, 2);
-        lcd.print(GameTimer.str());
+        lcd.print(gameTim.str());
     }
-    if(swT1.isPressed()) ledT1.inc();
-    else ledT1.dec();
-    if(swT2.isPressed()) ledT2.inc();
-    else ledT2.dec();
 
+    /* Advantage */
+    switch (adv) {
+        case ADV_NONE_NOPRESS:
+
+            /* Team 1 button is pressed */
+            if (swT1.read() == LOW) {
+                swT1Tim.setTime(0);
+                adv = ADV_NONE_T1PRESS;
+            }
+
+            /* Team 2 button is pressed */
+            if (swT2.read() == LOW) {
+                swT2Tim.setTime(0);
+                adv = ADV_NONE_T2PRESS;
+            }
+            break;
+
+        case ADV_NONE_T1PRESS:
+
+            /* Team 1 button is still pressed */
+            if (swT1.read() == LOW) {
+                if (swT1Tim.count()) {
+                    ledT1State = swT1Tim.inc();
+                    ledT1.set(ledT1State);
+                }
+                if(ledT1State == 5) {
+                    t1Tim.setTime(t1Time_s);
+                    adv = ADV_T1_NOPRESS;
+                }
+            }
+            break;
+
+        case ADV_NONE_T2PRESS:
+
+            /* Team 2 button is still pressed */
+            if (swT2.read() == LOW) {
+                if (swT2Tim.count()) {
+                    ledT2State = swT2Tim.inc();
+                    ledT2.set(ledT2State);
+                }
+                if(ledT2State == 5) {
+                    t2Tim.setTime(t2Time_s);
+                    adv = ADV_T2_NOPRESS;
+                }
+            }
+            break;
+
+        case ADV_T1_NOPRESS:
+
+            /* T1 Timer is increasing */
+            if (t1Tim.count()) {
+                t1Time_s = t1Tim.inc();
+                lcd.setCursor(12, 0);
+                lcd.print(t1Tim.str());
+            }
+            break;
+
+            /* Team 2 button is pressed */
+            if (swT2.read() == LOW) {
+                swT2Tim.setTime(0);
+                adv = ADV_NONE_T2PRESS;
+            }
+
+        case ADV_T1_T2PRESS:
+            break;
+
+        case ADV_T2_NOPRESS:
+
+            /* T2 Timer is increasing */
+            if (t2Tim.count()) {
+                t2Time_s = t2Tim.inc();
+                lcd.setCursor(12, 1);
+                lcd.print(t2Tim.str());
+            }
+            break;
+
+        case ADV_T2_T1PRESS:
+            break;
+
+        default:
+            break;
+    }
 }
 
 /*
@@ -566,9 +668,6 @@ void setup() {
 
     /* Keypad I2C with PCF8574 init */
     Keypad_Init();
-
-    /* GPIO init (Switch - Buzzer) */
-    GPIO_Init();
 }
 
 /*
