@@ -10,10 +10,11 @@
 *******************************************************************************/
 /*
  * Description:
- * Bomb SW for SoftAir - Arduino UNO
+ * Game Bomb SW for SoftAir - Arduino UNO
  *
  * Version log:
- * 0.0: First draft
+ * 0.0: First draft, mode A (Domination) implemented            - 16.10.2022
+ *
  */
 
 /******************************************************************************
@@ -395,19 +396,31 @@ void ModeSetTime_Loop(void) {
                         case MODE_B_JOINT:                      // Game B
 
                             /* Display set game time */
-                            lcd.setCursor(0, 0);
-                            lcd.print("SET CODE TEAM 1:    ");
-                            lcd.setCursor(0, 1);
-                            lcd.print("          (5 digits)");
+                            //lcd.setCursor(0, 0);
+                            //lcd.print("SET CODE TEAM 1:    ");
+                            //lcd.setCursor(0, 1);
+                            //lcd.print("          (5 digits)");
 
                             /* Next mode */
-                            mode = MODE_SET_CODE;
+                            //mode = MODE_SET_CODE;
+
+                            /* To be implemented */
+                            mode = MODE_B_JOINT;
+                            lcd.clear();
                             break;
 
                         case MODE_C_CLASSIC:                    // Game C
+
+                            /* To be implemented */
+                            mode = MODE_C_CLASSIC;
+                            lcd.clear();
                             break;
 
                         case MODE_D_POINTS:                     // Game D
+
+                            /* To be implemented */
+                            mode = MODE_D_POINTS;
+                            lcd.clear();
                             break;
 
                         default:
@@ -720,7 +733,6 @@ void ModeA_Loop(void) {
                 ledT1.reset();
                 adv = ADV_NONE_NOPRESS;
             }
-
             break;
 
         case ADV_NONE_T2PRESS:
@@ -855,18 +867,24 @@ void ModeA_Loop(void) {
  *  Mode B: Joint Operation
  */
 void ModeB_Loop(void) {
+    lcd.setCursor(0, 3);
+    lcd.print("MODE B NOT AVAILABLE");
 }
 
 /*
  *  Mode C: Classic
  */
 void ModeC_Loop(void) {
+    lcd.setCursor(0, 3);
+    lcd.print("MODE C NOT AVAILABLE");
 }
 
 /*
  *  Mode D: Points Game
  */
 void ModeD_Loop(void) {
+    lcd.setCursor(0, 3);
+    lcd.print("MODE D NOT AVAILABLE");
 }
 
 /******************************************************************************
