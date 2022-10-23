@@ -14,7 +14,7 @@
  *
  * Version log:
  * 0.0: First draft, mode A (Domination) implemented            - 16.10.2022
- * 0.1:
+ * 0.1: mode B (Joing Operation) implemented                    - 23.10.2022
  *
  */
 
@@ -1114,8 +1114,8 @@ void ModeB_Loop(void) {
         if ((ledT1State == 5) && (ledT2State == 5)) {
             lcd.setCursor(0, 0);
             lcd.print("BOMB DISARMED");
-            ledT1.blink(1000);
-            ledT2.blink(1000);
+            ledT1.blink(500);
+            ledT2.blink(500);
         }
 
         /* Bomb exploded */
