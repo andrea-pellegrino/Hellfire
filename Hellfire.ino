@@ -3,7 +3,7 @@
 * Filename              :   Hellfire.ino
 * Author                :   Andrea Pellegrino
 * Origin Date           :   17/07/2022
-* Version               :   0.0
+* Version               :   0.1
 * Compiler              :   avr-gcc
 * Target                :   Arduino UNO (avr)
 * Notes                 :   using arduino-cli
@@ -14,6 +14,7 @@
  *
  * Version log:
  * 0.0: First draft, mode A (Domination) implemented            - 16.10.2022
+ * 0.1:
  *
  */
 
@@ -36,7 +37,7 @@
 *******************************************************************************/
 /* Software Version */
 #define SW_VERSION      0
-#define SW_REVISION     0
+#define SW_REVISION     1
 
 /* I2C Address */
 #define I2C_ADR_KEY     0x20        // I2C Keypad Address (I2C Expansion PCF8574)
@@ -74,14 +75,15 @@ enum mode_e {
 
 /* Game advantage */
 enum adv_e {
-    ADV_NONE_NOPRESS,
-    ADV_NONE_T1PRESS,
-    ADV_NONE_T2PRESS,
-    ADV_T1_NOPRESS,
-    ADV_T1_T2PRESS,
-    ADV_T2_NOPRESS,
-    ADV_T2_T1PRESS,
-    ADV_END_GAME
+    ADV_NONE_NOPRESS,       // Mode: A, B
+    ADV_NONE_T1PRESS,       // Mode: A, B
+    ADV_NONE_T2PRESS,       // Mode: A, B
+    ADV_T1_NOPRESS,         // Mode: A
+    ADV_T1_T2PRESS,         // Mode: A
+    ADV_T2_NOPRESS,         // Mode: A
+    ADV_T2_T1PRESS,         // Mode: A
+    ADV_INS_PASSWORD,       // Mode: B
+    ADV_END_GAME            // Mode: A
 };
 
 /******************************************************************************
@@ -129,11 +131,13 @@ unsigned int t1Time_s;
 unsigned int t2Time_s;
 unsigned int gameTime_s;
 
-/* Code */
+/* Code/Password */
 char codeT1_str[6];
 char codeT2_str[6];
-long codeT1_uint;
-long codeT2_uint;
+char codeSet_str[6];
+long codeT1_long;
+long codeT2_long;
+long codeSet_long;
 
 /******************************************************************************
 * Generic Functions
@@ -396,17 +400,13 @@ void ModeSetTime_Loop(void) {
                         case MODE_B_JOINT:                      // Game B
 
                             /* Display set game time */
-                            //lcd.setCursor(0, 0);
-                            //lcd.print("SET CODE TEAM 1:    ");
-                            //lcd.setCursor(0, 1);
-                            //lcd.print("          (5 digits)");
+                            lcd.setCursor(0, 0);
+                            lcd.print("SET PASSWORD TEAM 1:");
+                            lcd.setCursor(0, 1);
+                            lcd.print("          (5 digits)");
 
                             /* Next mode */
-                            //mode = MODE_SET_CODE;
-
-                            /* To be implemented */
-                            mode = MODE_B_JOINT;
-                            lcd.clear();
+                            mode = MODE_SET_CODE;
                             break;
 
                         case MODE_C_CLASSIC:                    // Game C
@@ -503,8 +503,8 @@ void ModeSetCode_Loop(void) {
                 if (x == 5) {
 
                     /* Convert digits string into int */
-                    if(!fTeam) codeT1_uint = atol(codeT1_str);
-                    else codeT2_uint = atol(codeT2_str);
+                    if(!fTeam) codeT1_long = atol(codeT1_str);
+                    else codeT2_long = atol(codeT2_str);
 
                     /* Go to selected game */
                     switch (selMode) {
@@ -518,7 +518,7 @@ void ModeSetCode_Loop(void) {
 
                                 /* Display set game time */
                                 lcd.setCursor(0, 0);
-                                lcd.print("SET CODE TEAM 2:    ");
+                                lcd.print("SET PASSWORD TEAM 2:");
                                 lcd.setCursor(0, 1);
                                 lcd.print("          (5 digits)");
                                 lcd.setCursor(0, 2);
@@ -656,6 +656,8 @@ void ModeStartGame_Loop(void) {
             case MODE_B_JOINT:                      // B
 
                 /* Display show current game */
+                lcd.setCursor(12, 2);
+                lcd.print(gameTim.str());
                 lcd.setCursor(0, 3);
                 lcd.print("MODE: B    JOINT OP.");
                 break;
@@ -689,13 +691,16 @@ void ModeStartGame_Loop(void) {
 void ModeA_Loop(void) {
 
     /* Game time counter */
-    if (gameTim.count()) {
+    if ((gameTim.count()) && (adv != ADV_END_GAME)) {
         gameTime_s = gameTim.dec();
         lcd.setCursor(12, 2);
         lcd.print(gameTim.str());
 
         /* Game over */
-        if (gameTime_s == 0) adv = ADV_END_GAME;
+        if (gameTime_s == 0) {
+            lcd.clear();
+            adv = ADV_END_GAME;
+        }
     }
 
     /* Advantage */
@@ -843,16 +848,22 @@ void ModeA_Loop(void) {
 
             /* Team 1 wins */
             if (t1Time_s > t2Time_s) {
+                lcd.setCursor(0, 0);
+                lcd.print("TEAM 1 WINS");
                 ledT1.blink(50);
                 ledT2.reset();
             }
             /* Team 2 wins */
             else if (t2Time_s > t1Time_s) {
+                lcd.setCursor(0, 0);
+                lcd.print("TEAM 2 WINS");
                 ledT1.reset();
                 ledT2.blink(50);
             }
             /* Draw */
             else {
+                lcd.setCursor(0, 0);
+                lcd.print("DRAW");
                 ledT1.blink(50);
                 ledT2.blink(50);
             }
@@ -867,8 +878,259 @@ void ModeA_Loop(void) {
  *  Mode B: Joint Operation
  */
 void ModeB_Loop(void) {
-    lcd.setCursor(0, 3);
-    lcd.print("MODE B NOT AVAILABLE");
+    static int x;            // cursor position
+    static bool fTeam;       // 0-> team 1   1-> team 2
+    static int att;          // n° of attemps
+
+    /* Game time counter */
+    if ((gameTim.count()) && (adv != ADV_END_GAME)) {
+        gameTime_s = gameTim.dec();
+        lcd.setCursor(12, 2);
+        lcd.print(gameTim.str());
+
+        /* Game over */
+        if (gameTime_s == 0) {
+            lcd.clear();
+            adv = ADV_END_GAME;
+        }
+    }
+
+    /* Advantage */
+    switch (adv) {
+        case ADV_NONE_NOPRESS:
+
+            /* Team 1 button is pressed and T1 not done */
+            if ((ledT1State == 0) && (swT1.read() == LOW)) {
+                ledT1Tim.setTime(0);
+                adv = ADV_NONE_T1PRESS;
+            }
+
+            /* Team 2 button is pressed and T2 not done */
+            if ((ledT2State == 0) && (swT2.read() == LOW)) {
+                ledT2Tim.setTime(0);
+                adv = ADV_NONE_T2PRESS;
+            }
+
+            /* If both T1 and T2 are done, end of game */
+            if ((ledT1State == 5) && (ledT2State == 5)) {
+                lcd.clear();
+                adv = ADV_END_GAME;
+            }
+            break;
+
+        case ADV_NONE_T1PRESS:
+
+            /* Team 1 Led Bar increases */
+            if (swT1.read() == LOW) {
+                if (ledT1Tim.count()) {
+                    ledT1State = ledT1Tim.inc();
+                    ledT1.inc();
+                }
+                if(ledT1State == 5) {
+                    t1Tim.setTime(t1Time_s);
+                    adv = ADV_INS_PASSWORD;
+                    fTeam = false;       // 1st team
+                    lcd.setCursor(0, 0);
+                    lcd.print("TEAM 1 INS PASSWORD ");
+                    lcd.setCursor(0, 2);
+                    lcd.print("3 REM.");
+                }
+            }
+            /* Button released early */
+            else {
+                ledT1.reset();
+                ledT1State = 0;
+                adv = ADV_NONE_NOPRESS;
+            }
+            break;
+
+        case ADV_NONE_T2PRESS:
+
+            /* Team 2 Led Bar increases */
+            if (swT2.read() == LOW) {
+                if (ledT2Tim.count()) {
+                    ledT2State = ledT2Tim.inc();
+                    ledT2.inc();
+                }
+                if(ledT2State == 5) {
+                    t2Tim.setTime(t2Time_s);
+                    adv = ADV_INS_PASSWORD;
+                    fTeam = true;       // 2nd team
+                    lcd.setCursor(0, 0);
+                    lcd.print("TEAM 2 INS PASSWORD ");
+                    lcd.setCursor(0, 2);
+                    lcd.print("3 REM.");
+                }
+            }
+            /* Button released early */
+            else {
+                ledT2.reset();
+                ledT2State = 0;
+                adv = ADV_NONE_NOPRESS;
+            }
+            break;
+
+        case ADV_INS_PASSWORD:
+
+        /* Keypad */
+        if (KeyRising()) {      // When rising edge
+            switch (ch) {
+                case '0'...'9':
+
+                    /* Write ditigs (max 5 digits) */
+                    if ((x >= 0) && (x <= 4)) {
+
+                        /* Display print digit */
+                        lcd.setCursor(x, 1);
+                        lcd.print(ch);
+
+                        /* Save digit into string */
+                        codeSet_str[x] = ch;
+                        x++;
+
+                        if (x == 5) {
+
+                            /* Display confirm code*/
+                            lcd.noBlink();
+                            lcd.setCursor(7, 0);
+                            lcd.print("CONFIRM?     ");
+                        }
+                    }
+                    break;
+
+                case '*':
+
+                    if (x == 5) {
+
+                        /* Convert digits string into int */
+                        codeSet_long = atol(codeSet_str);
+                        if(!fTeam) {        // Team 1
+
+                            /* Code is correct */
+                            if(codeSet_long == codeT1_long) {
+                                att = 0;
+                                x = 0;
+
+                                /* Reset text */
+                                lcd.setCursor(0, 0);
+                                lcd.print("                    ");
+                                lcd.setCursor(0, 1);
+                                lcd.print("                    ");
+                                lcd.setCursor(0, 2);
+                                lcd.print("      ");
+                                adv = ADV_NONE_NOPRESS;
+                            }
+                            else {
+                                att++;
+                                x = 0;
+
+                                /* Reset Code */
+                                lcd.setCursor(0, 1);
+                                lcd.print("       ");
+
+                                /* Change remaining attemps */
+                                lcd.setCursor(0, 2);
+                                if (att == 1) lcd.print("2 REM.");
+                                else if (att == 2) lcd.print("1 REM.");
+
+
+                                /* Reset Confirm */
+                                lcd.setCursor(7, 0);
+                                lcd.print("INS PASSWORD ");
+                            }
+                        }
+                        else {              // Team 2
+                            /* Code is correct */
+                            if(codeSet_long == codeT2_long) {
+                                att = 0;
+                                x = 0;
+
+                                /* Reset text */
+                                lcd.setCursor(0, 0);
+                                lcd.print("                    ");
+                                lcd.setCursor(0, 1);
+                                lcd.print("                    ");
+                                lcd.setCursor(0, 2);
+                                lcd.print("      ");
+                                adv = ADV_NONE_NOPRESS;
+                            }
+                            else {
+                                att++;
+                                x = 0;
+
+                                /* Reset Code */
+                                lcd.setCursor(0, 1);
+                                lcd.print("       ");
+
+                                /* Change remaining attemps */
+                                lcd.setCursor(0, 2);
+                                if (att == 1) lcd.print("2 REM.");
+                                else if (att == 2) lcd.print("1 REM.");
+
+                                /* Reset Confirm */
+                                lcd.setCursor(7, 0);
+                                lcd.print("INS PASSWORD ");
+                            }
+                        }
+                    }
+                    break;
+
+                case '#':
+
+                    /* Delete ditigs (max 5 digits) */
+                    if ((x >= 1) && (x <= 5)) {
+
+                        /* Reset Confirm */
+                        lcd.setCursor(7, 0);
+                        lcd.print("INS PASSWORD ");
+
+                        /* Display remove digit */
+                        x--;
+                        lcd.setCursor(x, 1);
+                        lcd.print(" ");
+                        lcd.setCursor(x, 1);
+
+                        /* Remove digit from string */
+                        codeSet_str[x] = ch;
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        /* If attemps are 3, end of game */
+        if (att == 3) {
+            lcd.clear();
+            adv = ADV_END_GAME;
+        }
+
+        break;
+
+    case ADV_END_GAME:
+
+        /* Bomb disarmed */
+        if ((ledT1State == 5) && (ledT2State == 5)) {
+            lcd.setCursor(0, 0);
+            lcd.print("BOMB DISARMED");
+            ledT1.blink(1000);
+            ledT2.blink(1000);
+        }
+
+        /* Bomb exploded */
+        else {
+            lcd.setCursor(0, 0);
+            lcd.print("BOMB EXPLODED");
+            ledT1.blink(50);
+            ledT2.blink(50);
+        }
+
+        break;
+
+    default:
+        break;
+    }
 }
 
 /*
