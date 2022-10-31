@@ -903,21 +903,39 @@ void ModeA_Loop(void) {
             /* Team 1 wins */
             if (t1Time_s > t2Time_s) {
                 lcd.setCursor(0, 0);
-                lcd.print("TEAM 1 WINS");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*   TEAM 1 WINS    *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.blink(50);
                 ledT2.reset();
             }
             /* Team 2 wins */
             else if (t2Time_s > t1Time_s) {
                 lcd.setCursor(0, 0);
-                lcd.print("TEAM 2 WINS");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*   TEAM 2 WINS    *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.reset();
                 ledT2.blink(50);
             }
             /* Draw */
             else {
                 lcd.setCursor(0, 0);
-                lcd.print("DRAW");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*       DRAW       *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.blink(50);
                 ledT2.blink(50);
             }
@@ -1139,16 +1157,26 @@ void ModeB_Loop(void) {
 
             /* Bomb disarmed */
             if ((ledT1State == 5) && (ledT2State == 5)) {
-                lcd.setCursor(0, 0);
-                lcd.print("BOMB DISARMED");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*   BOMB DISARMED  *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.blink(500);
                 ledT2.blink(500);
             }
 
             /* Bomb exploded */
             else {
-                lcd.setCursor(0, 0);
-                lcd.print("BOMB EXPLODED");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*   BOMB EXPLODED  *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.blink(50);
                 ledT2.blink(50);
             }
@@ -1337,7 +1365,13 @@ void ModeC_Loop(void) {
             /* Bomb disarmed */
             if (ledT1State == 5) {
                 lcd.setCursor(0, 0);
-                lcd.print("BOMB DISARMED");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*   BOMB DISARMED  *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.blink(500);
                 ledT2.blink(500);
             }
@@ -1345,7 +1379,13 @@ void ModeC_Loop(void) {
             /* Bomb exploded */
             else {
                 lcd.setCursor(0, 0);
-                lcd.print("BOMB EXPLODED");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*   BOMB EXPLODED  *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.blink(50);
                 ledT2.blink(50);
             }
@@ -1581,21 +1621,39 @@ void ModeD_Loop(void) {
             /* Team 1 wins */
             if (pointsT1 > pointsT2) {
                 lcd.setCursor(0, 0);
-                lcd.print("TEAM 1 WINS");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*   TEAM 1 WINS    *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.blink(50);
                 ledT2.reset();
             }
             /* Team 2 wins */
             else if (pointsT2 > pointsT1) {
                 lcd.setCursor(0, 0);
-                lcd.print("TEAM 2 WINS");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*   TEAM 2 WINS    *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.reset();
                 ledT2.blink(50);
             }
             /* Draw */
             else {
                 lcd.setCursor(0, 0);
-                lcd.print("DRAW");
+                lcd.print("********************");
+                lcd.setCursor(0, 1);
+                lcd.print("*       DRAW       *");
+                lcd.setCursor(0, 2);
+                lcd.print("*                  *");
+                lcd.setCursor(0, 3);
+                lcd.print("********************");
                 ledT1.blink(50);
                 ledT2.blink(50);
             }
