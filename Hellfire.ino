@@ -1157,6 +1157,7 @@ void ModeB_Loop(void) {
 
             /* Bomb disarmed */
             if ((ledT1State == 5) && (ledT2State == 5)) {
+                lcd.setCursor(0, 0);
                 lcd.print("********************");
                 lcd.setCursor(0, 1);
                 lcd.print("*   BOMB DISARMED  *");
@@ -1170,6 +1171,7 @@ void ModeB_Loop(void) {
 
             /* Bomb exploded */
             else {
+                lcd.setCursor(0, 0);
                 lcd.print("********************");
                 lcd.setCursor(0, 1);
                 lcd.print("*   BOMB EXPLODED  *");
@@ -1389,7 +1391,6 @@ void ModeC_Loop(void) {
                 ledT1.blink(50);
                 ledT2.blink(50);
             }
-
             break;
 
         default:
