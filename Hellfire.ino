@@ -3,7 +3,7 @@
 * Filename              :   Hellfire.ino
 * Author                :   Andrea Pellegrino
 * Origin Date           :   17/07/2022
-* Version               :   0.2
+* Version               :   0.3
 * Compiler              :   avr-gcc
 * Target                :   Arduino UNO (avr)
 * Notes                 :   using arduino-cli
@@ -15,8 +15,8 @@
  * Version log:
  * 0.0: First draft, mode A (Domination) implemented            - 16.10.2022
  * 0.1: mode B (Joing Operation) implemented                    - 23.10.2022
- * 0.2: mode C (Classic) implemented
- *
+ * 0.2: mode C (Classic) implemented                            - 31.10.2022
+ * 0.3: mode D (Points) implemented                             - 01.11.2022
  */
 
 /******************************************************************************
@@ -38,7 +38,7 @@
 *******************************************************************************/
 /* Software Version */
 #define SW_VERSION      0
-#define SW_REVISION     2
+#define SW_REVISION     3
 
 /* I2C Address */
 #define I2C_ADR_KEY     0x20        // I2C Keypad Address (I2C Expansion PCF8574)
@@ -59,6 +59,8 @@
 #define GPIO_SW_GRN     8
 #define GPIO_SW_RED     7
 
+#define MINUTE_S        60
+
 /******************************************************************************
 * Enumerations
 *******************************************************************************/
@@ -76,15 +78,16 @@ enum mode_e {
 
 /* Game advantage */
 enum adv_e {
-    ADV_NONE_NOPRESS,       // Mode: A, B
-    ADV_NONE_T1PRESS,       // Mode: A, B
-    ADV_NONE_T2PRESS,       // Mode: A, B
-    ADV_T1_NOPRESS,         // Mode: A
-    ADV_T1_T2PRESS,         // Mode: A
-    ADV_T2_NOPRESS,         // Mode: A
-    ADV_T2_T1PRESS,         // Mode: A
-    ADV_INS_PASSWORD,       // Mode: B
-    ADV_END_GAME            // Mode: A
+    ADV_NONE_NOPRESS,       // Mode: A, B, C, D
+    ADV_NONE_T1PRESS,       // Mode: A, B, C, D
+    ADV_NONE_T2PRESS,       // Mode: A, B, D
+    ADV_T1_NOPRESS,         // Mode: A, D
+    ADV_T1_T2PRESS,         // Mode: A, D
+    ADV_T2_NOPRESS,         // Mode: A, D
+    ADV_T2_T1PRESS,         // Mode: A, D
+    ADV_T1T2_NOPRESS,       // Mode: D
+    ADV_INS_PASSWORD,       // Mode: B, C
+    ADV_END_GAME            // Mode: A, B, C, D
 };
 
 /******************************************************************************
@@ -124,6 +127,11 @@ char ch;
 /* Ledbar variables */
 int ledT1State;
 int ledT2State;
+
+/* Points */
+int pointsT1;
+int pointsT2;
+char points_str[6];
 
 /* Time variables */
 char gameTime_str[4];                       // Set digits (min)
@@ -202,7 +210,7 @@ void LCD_Init(void) {
 }
 
 /*
- *  Keypad I2C Initialization
+ *  Keypad I2C Initialization + Button init
  */
 void Keypad_Init(void) {
 
@@ -428,9 +436,14 @@ void ModeSetTime_Loop(void) {
 
                         case MODE_D_POINTS:                     // Game D
 
-                            /* To be implemented */
-                            mode = MODE_D_POINTS;
-                            lcd.clear();
+                            /* Start game */
+                            lcd.setCursor(0, 0);
+                            lcd.print("PRESS * AND #       ");
+                            lcd.setCursor(0, 1);
+                            lcd.print("TO START THE GAME   ");
+
+                            /* Next mode (go to start game, no code is needed) */
+                            mode = MODE_START_GAME;
                             break;
 
                         default:
@@ -701,6 +714,16 @@ void ModeStartGame_Loop(void) {
                 break;
 
             case MODE_D_POINTS:                     // D
+
+            /* Display show current game init */
+                lcd.setCursor(0, 0);
+                lcd.print("Team 1 points: 0    ");
+                lcd.setCursor(0, 1);
+                lcd.print("Team 2 points: 0    ");
+                lcd.setCursor(0, 2);
+                lcd.print("Countdown:");
+                lcd.setCursor(12, 2);
+                lcd.print(gameTim.str());
 
                 /* Display show current game */
                 lcd.setCursor(0, 3);
@@ -1041,7 +1064,7 @@ void ModeB_Loop(void) {
                             /* Convert digits string into int */
                             codeSet_long = atol(codeSet_str);
 
-                            /* If ode is correct */
+                            /* If code is correct */
                             if(((codeSet_long == codeT1_long) && (!fTeam)) ||   // Team 1
                                ((codeSet_long == codeT2_long) && (fTeam))) {    // Team 2
                                 att = 0;
@@ -1338,8 +1361,249 @@ void ModeC_Loop(void) {
  *  Mode D: Points Game
  */
 void ModeD_Loop(void) {
-    lcd.setCursor(0, 3);
-    lcd.print("MODE D NOT AVAILABLE");
+    static int att;          // n° of attemps
+
+    /* Game time counter */
+    if ((gameTim.count()) && (adv != ADV_END_GAME)) {
+        gameTime_s = gameTim.dec();
+        lcd.setCursor(12, 2);
+        lcd.print(gameTim.str());
+
+        /* Game over */
+        if (gameTime_s == 0) {
+            lcd.clear();
+            adv = ADV_END_GAME;
+        }
+    }
+
+    /* Advantage */
+    switch (adv) {
+        case ADV_NONE_NOPRESS:
+
+            /* Team 1 button is pressed */
+            if (swT1.read() == LOW) {
+                ledT1Tim.setTime(0);
+                adv = ADV_NONE_T1PRESS;
+            }
+
+            /* Team 2 button is pressed */
+            if (swT2.read() == LOW) {
+                ledT2Tim.setTime(0);
+                adv = ADV_NONE_T2PRESS;
+            }
+            break;
+
+        case ADV_NONE_T1PRESS:
+
+            /* Team 1 Led Bar increases */
+            if (swT1.read() == LOW) {
+                if (ledT1Tim.count()) {
+                    ledT1State = ledT1Tim.inc();
+                    ledT1.inc();
+                }
+                if(ledT1State == 5) {
+                    pointsT1++;             // 1 point for Team 1
+                    snprintf(points_str, 5, "%d", pointsT1);
+                    lcd.setCursor(15, 0);
+                    lcd.print(points_str);
+                    t1Tim.setTime(0);      // Reset 1 minute timer
+                    t1Time_s = 0;
+                    adv = ADV_T1_NOPRESS;
+                }
+            }
+            /* Button released early */
+            else {
+                ledT1.reset();
+                ledT1State = 0;
+                adv = ADV_NONE_NOPRESS;
+            }
+            break;
+
+        case ADV_NONE_T2PRESS:
+
+            /* Team 2 Led Bar increases */
+            if (swT2.read() == LOW) {
+                if (ledT2Tim.count()) {
+                    ledT2State = ledT2Tim.inc();
+                    ledT2.inc();
+                }
+                if(ledT2State == 5) {
+                    pointsT2++;             // 1 point for Team 2
+                    snprintf(points_str, 5, "%d", pointsT2);
+                    lcd.setCursor(15, 1);
+                    lcd.print(points_str);
+                    t2Tim.setTime(0);      // Set 1 minute timer
+                    t2Time_s = 0;
+                    adv = ADV_T2_NOPRESS;
+                }
+            }
+            /* Button released early */
+            else {
+                ledT2.reset();
+                ledT2State = 0;
+                adv = ADV_NONE_NOPRESS;
+            }
+            break;
+
+        case ADV_T1_NOPRESS:
+
+            /* T1 Timer is increasing */
+            if (t1Tim.count()) {
+                t1Time_s = t1Tim.inc();
+            }
+
+            /* T1 Timer is over */
+            if (t1Time_s >= MINUTE_S) {
+                ledT1.reset();
+                ledT1State = 0;
+                adv = ADV_NONE_NOPRESS;
+            }
+
+            /* Team 2 button is pressed */
+            if (swT2.read() == LOW) {
+                ledT2Tim.setTime(0);
+                adv = ADV_T1_T2PRESS;
+            }
+            break;
+
+        case ADV_T1_T2PRESS:
+
+            /* T1 Timer is increasing */
+            if (t1Tim.count()) {
+                t1Time_s = t1Tim.inc();
+            }
+
+            /* Team 2 Led Bar increases */
+            if (swT2.read() == LOW) {
+                if (ledT2Tim.count()) {
+                    ledT2State = ledT2Tim.inc();
+                    ledT2.inc();
+                }
+                if(ledT2State == 5) {
+                    pointsT2++;             // 1 point for Team 2
+                    snprintf(points_str, 5, "%d", pointsT2);
+                    lcd.setCursor(15, 1);
+                    lcd.print(points_str);
+                    t2Tim.setTime(0);      // Set 1 minute timer
+                    t2Time_s = 0;
+                    adv = ADV_T1T2_NOPRESS;
+                }
+            }
+            /* Button released early */
+            else {
+                ledT2.reset();
+                ledT2State = 0;
+                adv = ADV_T1_NOPRESS;
+            }
+            break;
+
+        case ADV_T2_NOPRESS:
+
+            /* T2 Timer is increasing */
+            if (t2Tim.count()) {
+                t2Time_s = t2Tim.inc();
+            }
+
+            /* T2 Timer is over */
+            if (t2Time_s >= MINUTE_S) {
+                ledT2.reset();
+                ledT2State = 0;
+                adv = ADV_NONE_NOPRESS;
+            }
+
+            /* Team 1 button is pressed */
+            if (swT1.read() == LOW) {
+                ledT1Tim.setTime(0);
+                adv = ADV_T2_T1PRESS;
+            }
+            break;
+
+        case ADV_T2_T1PRESS:
+
+            /* T2 Timer is increasing */
+            if (t2Tim.count()) {
+                t2Time_s = t2Tim.inc();
+            }
+
+            /* Team 1 Led Bar increases */
+            if (swT1.read() == LOW) {
+                if (ledT1Tim.count()) {
+                    ledT1State = ledT1Tim.inc();
+                    ledT1.inc();
+                }
+                if(ledT1State == 5) {
+                    pointsT1++;             // 1 point for Team 1
+                    snprintf(points_str, 5, "%d", pointsT1);
+                    lcd.setCursor(15, 0);
+                    lcd.print(points_str);
+                    t1Tim.setTime(0);      // Set 1 minute timer
+                    t1Time_s = 0;
+                    adv = ADV_T1T2_NOPRESS;
+                }
+            }
+            /* Button released early */
+            else {
+                ledT1.reset();
+                ledT1State = 0;
+                adv = ADV_T2_NOPRESS;
+            }
+            break;
+
+        case ADV_T1T2_NOPRESS:
+
+            /* T1 Timer is increasing */
+            if (t1Tim.count()) {
+                t1Time_s = t1Tim.inc();
+            }
+
+            /* T2 Timer is increasing */
+            if (t2Tim.count()) {
+                t2Time_s = t2Tim.inc();
+            }
+
+            /* T1 Timer is over */
+            if (t1Time_s >= MINUTE_S) {
+                ledT1.reset();
+                ledT1State = 0;
+                adv = ADV_T2_NOPRESS;
+            }
+
+            /* T2 Timer is over */
+            if (t2Time_s >= MINUTE_S) {
+                ledT2.reset();
+                ledT2State = 0;
+                adv = ADV_T1_NOPRESS;
+            }
+            break;
+
+        case ADV_END_GAME:
+
+            /* Team 1 wins */
+            if (pointsT1 > pointsT2) {
+                lcd.setCursor(0, 0);
+                lcd.print("TEAM 1 WINS");
+                ledT1.blink(50);
+                ledT2.reset();
+            }
+            /* Team 2 wins */
+            else if (pointsT2 > pointsT1) {
+                lcd.setCursor(0, 0);
+                lcd.print("TEAM 2 WINS");
+                ledT1.reset();
+                ledT2.blink(50);
+            }
+            /* Draw */
+            else {
+                lcd.setCursor(0, 0);
+                lcd.print("DRAW");
+                ledT1.blink(50);
+                ledT2.blink(50);
+            }
+            break;
+
+        default:
+            break;
+    }
 }
 
 /******************************************************************************
