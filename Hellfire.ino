@@ -3,7 +3,7 @@
 * Filename              :   Hellfire.ino
 * Author                :   Andrea Pellegrino
 * Origin Date           :   17/07/2022
-* Version               :   0.4
+* Version               :   0.5
 * Compiler              :   avr-gcc
 * Target                :   Arduino UNO (avr)
 * Notes                 :   using arduino-cli
@@ -18,6 +18,7 @@
  * 0.2: mode C (Classic) implemented                            - 31.10.2022
  * 0.3: mode D (Points) implemented                             - 01.11.2022
  * 0.4: change LED bar time + buzzer added                      - 02.11.2022
+ * 0.5: correzione bug + uscita supplementare bomba esplosa     - 10.11.2022
  */
 
 /******************************************************************************
@@ -39,7 +40,7 @@
 *******************************************************************************/
 /* Software Version */
 #define SW_VERSION      0
-#define SW_REVISION     4
+#define SW_REVISION     5
 
 /* I2C Address */
 #define I2C_ADR_KEY     0x20        // I2C Keypad Address (I2C Expansion PCF8574)
@@ -59,10 +60,12 @@
 #define GPIO_BZR        9
 #define GPIO_SW_GRN     8
 #define GPIO_SW_RED     7
+#define GPIO_BOMB       6
 
 /* Time definition */
 #define MINUTE_S        60
 #define LEDBAR_S        5           // Default value led num (5 leds -> 5 sec)
+#define BOMB_OUT_S      20          // 20 seconds output high
 
 /* Keypad definition */
 #define ROW_N           4
@@ -114,7 +117,7 @@ LiquidCrystal_I2C lcd(I2C_ADR_LCD, COL_N, ROW_N);   // I2C LCD 20x4 line display
 I2CKeyPad keypad(I2C_ADR_KEY);                      // I2C Keypad (with PCF8574)
 LedBar ledT1(ledMapT1, LEDBAR_S);                   // Blue LED bar (team 1)
 LedBar ledT2(ledMapT2, LEDBAR_S);                   // Yellow LED bar (team 2)
-TimeCount gameTim;                                  // Timer of Game
+TimeCount gameTim;                                  // Timer of Game & bomb output
 TimeCount ledT1Tim;                                 // Timer of led bar (team 1)
 TimeCount ledT2Tim;                                 // Timer of led bar (team 2)
 TimeCount t1Tim;                                    // Game timer of team 1
@@ -191,7 +194,7 @@ bool KeyRising(void) {
 /*
  *  Buzzer start
  */
-bool buzzStart(void) {
+bool BuzzStart(void) {
 
     buzzer.sound(NOTE_G3, 100);
     buzzer.sound(NOTE_A4, 100);
@@ -203,7 +206,7 @@ bool buzzStart(void) {
 /*
  *  Buzzer short button sound
  */
-bool buzzButtonShort(void) {
+bool BuzzButtonShort(void) {
 
     buzzer.sound(NOTE_C4, 250);
 }
@@ -212,7 +215,7 @@ bool buzzButtonShort(void) {
 /*
  *  Buzzer long button sound
  */
-bool buzzButtonLong(void) {
+bool BuzzButtonLong(void) {
 
     buzzer.sound(NOTE_C4, 200);
     buzzer.sound(NOTE_C4, 200);
@@ -222,7 +225,7 @@ bool buzzButtonLong(void) {
 /*
  *  Buzzer game over good sound
  */
-bool buzzGoodEnd(void) {
+bool BuzzGoodEnd(void) {
 
     buzzer.sound(NOTE_G3, 100);
     buzzer.sound(NOTE_A4, 100);
@@ -244,7 +247,7 @@ bool buzzGoodEnd(void) {
 /*
  *  Buzzer game over bad sound
  */
-bool buzzBadEnd(void) {
+bool BuzzBadEnd(void) {
 
     buzzer.sound(NOTE_G4, 1000);
     buzzer.sound(NOTE_C5, 1000);
@@ -253,9 +256,27 @@ bool buzzBadEnd(void) {
 /*
  *  Buzzer start game
  */
-bool buzzStartGame(void) {
+bool BuzzStartGame(void) {
 
     buzzer.sound(NOTE_C5, 500);
+}
+
+/*
+ *  Buzzer start game
+ */
+bool BombExplOut(void) {
+    static bool fBombExpl_first = true;
+
+    /* Set HIGH */
+    if(fBombExpl_first) {
+        fBombExpl_first = false;
+        gameTim.setTime(BOMB_OUT_S);
+        digitalWrite(GPIO_BOMB, HIGH);
+    }
+    gameTime_s = gameTim.dec();
+
+    /* Set LOW */
+    if (gameTime_s == 0) digitalWrite(GPIO_BOMB, LOW);
 }
 
 /******************************************************************************
@@ -291,11 +312,11 @@ void LCD_Init(void) {
     snprintf(version_str, 8, "v%d.%d", SW_VERSION, SW_REVISION);
     lcd.print(version_str);
 
-    buzzStart();
+    BuzzStart();
 }
 
 /*
- *  Keypad I2C Initialization + Button init
+ *  Keypad I2C Initialization
  */
 void Keypad_Init(void) {
 
@@ -304,10 +325,19 @@ void Keypad_Init(void) {
 
     /* Keypad load key map */
     keypad.loadKeyMap(keymap);
+}
+
+/*
+ *  Button init & Bomb Out init
+ */
+void GPIO_Init(void) {
 
     /* Button begin */
     swT1.begin();
     swT2.begin();
+
+    /* Bomb output init */
+    pinMode(GPIO_BOMB, OUTPUT);
 }
 
 /******************************************************************************
@@ -498,6 +528,10 @@ void ModeChangeLedTime_Loop(void) {
                     lcd.print("SELECT MODE GAME");
                     lcd.setCursor(0, 3);
                     lcd.print(version_str);
+
+                    /* Reset cursor position */
+                    x = 0;
+                    ledBarTime_str[0] = 0;
 
                     /* Next mode */
                     mode = MODE_SELECT;
@@ -847,7 +881,7 @@ void ModeStartGame_Loop(void) {
         t1Tim.setTime(t1Time_s);
         t2Tim.setTime(t2Time_s);
 
-        buzzStartGame();
+        BuzzStartGame();
 
         /* Display still configuration */
         switch (selMode) {
@@ -946,14 +980,14 @@ void ModeA_Loop(void) {
             /* Team 1 button is pressed */
             if (swT1.read() == LOW) {
                 ledT1Tim.setTime(0);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_NONE_T1PRESS;
             }
 
             /* Team 2 button is pressed */
             if (swT2.read() == LOW) {
                 ledT2Tim.setTime(0);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_NONE_T2PRESS;
             }
             break;
@@ -968,7 +1002,7 @@ void ModeA_Loop(void) {
                 }
                 if (ledT1State == ledBarTime_s) {
                     t1Tim.setTime(t1Time_s);
-                    buzzButtonLong();
+                    BuzzButtonLong();
                     adv = ADV_T1_NOPRESS;
                 }
             }
@@ -989,7 +1023,7 @@ void ModeA_Loop(void) {
                 }
                 if (ledT2State == ledBarTime_s) {
                     t2Tim.setTime(t2Time_s);
-                    buzzButtonLong();
+                    BuzzButtonLong();
                     adv = ADV_T2_NOPRESS;
                 }
             }
@@ -1012,7 +1046,7 @@ void ModeA_Loop(void) {
             /* Team 2 button is pressed */
             if (swT2.read() == LOW) {
                 ledT1Tim.setTime(ledBarTime_s);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_T1_T2PRESS;
             }
             break;
@@ -1055,7 +1089,7 @@ void ModeA_Loop(void) {
             /* Team 1 button is pressed */
             if (swT1.read() == LOW) {
                 ledT2Tim.setTime(ledBarTime_s);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_T2_T1PRESS;
             }
             break;
@@ -1101,7 +1135,7 @@ void ModeA_Loop(void) {
                 ledT1.blink(50);
                 ledT2.reset();
 
-                buzzGoodEnd();
+                BuzzGoodEnd();
             }
             /* Team 2 wins */
             else if (t2Time_s > t1Time_s) {
@@ -1116,7 +1150,7 @@ void ModeA_Loop(void) {
                 ledT1.reset();
                 ledT2.blink(50);
 
-                buzzGoodEnd();
+                BuzzGoodEnd();
             }
             /* Draw */
             else {
@@ -1131,7 +1165,7 @@ void ModeA_Loop(void) {
                 ledT1.blink(50);
                 ledT2.blink(50);
 
-                buzzBadEnd();
+                BuzzGoodEnd();
             }
             break;
 
@@ -1169,14 +1203,14 @@ void ModeB_Loop(void) {
             /* Team 1 button is pressed and T1 not done */
             if ((ledT1State == 0) && (swT1.read() == LOW)) {
                 ledT1Tim.setTime(0);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_NONE_T1PRESS;
             }
 
             /* Team 2 button is pressed and T2 not done */
             if ((ledT2State == 0) && (swT2.read() == LOW)) {
                 ledT2Tim.setTime(0);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_NONE_T2PRESS;
             }
 
@@ -1197,7 +1231,7 @@ void ModeB_Loop(void) {
                 }
                 if (ledT1State == ledBarTime_s) {
                     t1Tim.setTime(t1Time_s);
-                    buzzButtonLong();
+                    BuzzButtonLong();
                     adv = ADV_INS_PASSWORD;
                     fTeam = false;       // 1st team
                     lcd.setCursor(0, 0);
@@ -1226,7 +1260,7 @@ void ModeB_Loop(void) {
                 }
                 if (ledT2State == ledBarTime_s) {
                     t2Tim.setTime(t2Time_s);
-                    buzzButtonLong();
+                    BuzzButtonLong();
                     adv = ADV_INS_PASSWORD;
                     fTeam = true;       // 2nd team
                     lcd.setCursor(0, 0);
@@ -1298,7 +1332,7 @@ void ModeB_Loop(void) {
                             else {
                                 att++;
                                 x = 0;
-                                buzzButtonShort();
+                                BuzzButtonShort();
 
                                 /* Reset Code */
                                 lcd.setCursor(0, 1);
@@ -1369,7 +1403,7 @@ void ModeB_Loop(void) {
                 ledT1.blink(500);
                 ledT2.blink(500);
 
-                buzzGoodEnd();
+                BuzzGoodEnd();
             }
 
             /* Bomb exploded */
@@ -1385,7 +1419,10 @@ void ModeB_Loop(void) {
                 ledT1.blink(50);
                 ledT2.blink(50);
 
-                buzzBadEnd();
+                /* Bomb explosion output function */
+                BombExplOut();
+
+                BuzzBadEnd();
             }
             break;
 
@@ -1422,7 +1459,7 @@ void ModeC_Loop(void) {
             /* Team 1 & 2 button are pressed and T1 not done */
             if ((ledT1State == 0) && (swT1.read() == LOW) && (swT2.read() == LOW)) {
                 ledT1Tim.setTime(0);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_NONE_T1PRESS;
             }
 
@@ -1446,7 +1483,7 @@ void ModeC_Loop(void) {
                 }
                 if (ledT1State == ledBarTime_s) {
                     t1Tim.setTime(t1Time_s);
-                    buzzButtonLong();
+                    BuzzButtonLong();
                     adv = ADV_INS_PASSWORD;
                     lcd.setCursor(0, 0);
                     lcd.print("INSERT PASSWORD ");
@@ -1517,7 +1554,7 @@ void ModeC_Loop(void) {
                                 else {
                                     att++;
                                     x = 0;
-                                    buzzButtonShort();
+                                    BuzzButtonShort();
 
                                     /* Reset Code */
                                     lcd.setCursor(0, 1);
@@ -1587,7 +1624,7 @@ void ModeC_Loop(void) {
                 ledT1.blink(500);
                 ledT2.blink(500);
 
-                buzzGoodEnd();
+                BuzzGoodEnd();
             }
 
             /* Bomb exploded */
@@ -1603,7 +1640,10 @@ void ModeC_Loop(void) {
                 ledT1.blink(50);
                 ledT2.blink(50);
 
-                buzzBadEnd();
+                /* Bomb explosion output function */
+                BombExplOut();
+
+                BuzzBadEnd();
             }
             break;
 
@@ -1638,14 +1678,14 @@ void ModeD_Loop(void) {
             /* Team 1 button is pressed */
             if (swT1.read() == LOW) {
                 ledT1Tim.setTime(0);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_NONE_T1PRESS;
             }
 
             /* Team 2 button is pressed */
             if (swT2.read() == LOW) {
                 ledT2Tim.setTime(0);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_NONE_T2PRESS;
             }
             break;
@@ -1665,7 +1705,7 @@ void ModeD_Loop(void) {
                     lcd.print(points_str);
                     t1Tim.setTime(0);      // Reset 1 minute timer
                     t1Time_s = 0;
-                    buzzButtonLong();
+                    BuzzButtonLong();
                     adv = ADV_T1_NOPRESS;
                 }
             }
@@ -1692,7 +1732,7 @@ void ModeD_Loop(void) {
                     lcd.print(points_str);
                     t2Tim.setTime(0);      // Set 1 minute timer
                     t2Time_s = 0;
-                    buzzButtonLong();
+                    BuzzButtonLong();
                     adv = ADV_T2_NOPRESS;
                 }
             }
@@ -1720,7 +1760,7 @@ void ModeD_Loop(void) {
 
             /* Team 2 button is pressed */
             if (swT2.read() == LOW) {
-                buzzButtonShort();
+                BuzzButtonShort();
                 ledT2Tim.setTime(0);
                 adv = ADV_T1_T2PRESS;
             }
@@ -1746,7 +1786,7 @@ void ModeD_Loop(void) {
                     lcd.print(points_str);
                     t2Tim.setTime(0);      // Set 1 minute timer
                     t2Time_s = 0;
-                    buzzButtonLong();
+                    BuzzButtonLong();
                     adv = ADV_T1T2_NOPRESS;
                 }
             }
@@ -1775,7 +1815,7 @@ void ModeD_Loop(void) {
             /* Team 1 button is pressed */
             if (swT1.read() == LOW) {
                 ledT1Tim.setTime(0);
-                buzzButtonShort();
+                BuzzButtonShort();
                 adv = ADV_T2_T1PRESS;
             }
             break;
@@ -1800,7 +1840,7 @@ void ModeD_Loop(void) {
                     lcd.print(points_str);
                     t1Tim.setTime(0);      // Set 1 minute timer
                     t1Time_s = 0;
-                    buzzButtonLong();
+                    BuzzButtonLong();
                     adv = ADV_T1T2_NOPRESS;
                 }
             }
@@ -1854,7 +1894,7 @@ void ModeD_Loop(void) {
                 ledT1.blink(50);
                 ledT2.reset();
 
-                buzzGoodEnd();
+                BuzzGoodEnd();
             }
             /* Team 2 wins */
             else if (pointsT2 > pointsT1) {
@@ -1869,7 +1909,7 @@ void ModeD_Loop(void) {
                 ledT1.reset();
                 ledT2.blink(50);
 
-                buzzGoodEnd();
+                BuzzGoodEnd();
             }
             /* Draw */
             else {
@@ -1884,7 +1924,7 @@ void ModeD_Loop(void) {
                 ledT1.blink(50);
                 ledT2.blink(50);
 
-                buzzBadEnd();
+                BuzzGoodEnd();
             }
             break;
 
@@ -1909,6 +1949,9 @@ void setup() {
 
     /* Keypad I2C with PCF8574 init */
     Keypad_Init();
+
+    /* GPIO init */
+    GPIO_Init();
 }
 
 /*
