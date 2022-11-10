@@ -41,6 +41,7 @@
 #define DEBUG           0
 
 #define SERIAL_BAUDRATE 9600
+#define I2C_CLOCK_FRQ   100000      // I2c speed at 100k
 
 /* Software Version */
 #define SW_VERSION      0
@@ -294,6 +295,7 @@ void Serial_Init(void) {
     Serial.begin(SERIAL_BAUDRATE);
     Serial.print("Welcome to Hellfire");
 }
+
 /*
  *  I2C Wire Initialization
  */
@@ -302,8 +304,8 @@ void Serial_Init(void) {
      /* I2c begin */
      Wire.begin();
 
-     /* I2c speed at 100k */
-     Wire.setClock(100000);
+     /* I2c speed */
+     Wire.setClock(I2C_CLOCK_FRQ);
  }
 
 /*
