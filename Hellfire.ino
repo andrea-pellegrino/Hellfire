@@ -325,8 +325,6 @@ void LCD_Init(void) {
     lcd.setCursor(0, 3);
     snprintf(version_str, 8, "v%d.%d", SW_VERSION, SW_REVISION);
     lcd.print(version_str);
-
-    BuzzStart();
 }
 
 /*
@@ -352,6 +350,8 @@ void GPIO_Init(void) {
 
     /* Bomb output init */
     pinMode(GPIO_BOMB, OUTPUT);
+
+    BuzzStart();
 }
 
 /******************************************************************************
