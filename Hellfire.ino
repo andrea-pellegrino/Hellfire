@@ -38,6 +38,10 @@
 /******************************************************************************
 * Defines
 *******************************************************************************/
+#define DEBUG           0
+
+#define SERIAL_BAUDRATE 9600
+
 /* Software Version */
 #define SW_VERSION      0
 #define SW_REVISION     5
@@ -282,6 +286,14 @@ bool BombExplOut(void) {
 /******************************************************************************
 * Init Functions
 *******************************************************************************/
+/*
+ *  I2C Wire Initialization
+ */
+void Serial_Init(void) {
+
+    Serial.begin(SERIAL_BAUDRATE);
+    Serial.print("Welcome to Hellfire");
+}
 /*
  *  I2C Wire Initialization
  */
@@ -1952,6 +1964,12 @@ void setup() {
 
     /* GPIO init */
     GPIO_Init();
+
+    #if DEBUG
+    /* Serial init */
+    Serial_Init();
+    #endif
+
 }
 
 /*
