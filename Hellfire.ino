@@ -122,6 +122,7 @@ LiquidCrystal_I2C lcd(I2C_ADR_LCD, COL_N, ROW_N);   // I2C LCD 20x4 line display
 I2CKeyPad keypad(I2C_ADR_KEY);                      // I2C Keypad (with PCF8574)
 LedBar ledT1(ledMapT1, LEDBAR_S);                   // Blue LED bar (team 1)
 LedBar ledT2(ledMapT2, LEDBAR_S);                   // Yellow LED bar (team 2)
+TimeCount onTim;                                    // Timer ON
 TimeCount gameTim;                                  // Timer of Game & bomb output
 TimeCount ledT1Tim;                                 // Timer of led bar (team 1)
 TimeCount ledT2Tim;                                 // Timer of led bar (team 2)
@@ -288,7 +289,7 @@ bool BombExplOut(void) {
 * Init Functions
 *******************************************************************************/
 /*
- *  I2C Wire Initialization
+ *  Serial Monitor Initialization (DEBUG)
  */
 void Serial_Init(void) {
 
@@ -352,6 +353,7 @@ void GPIO_Init(void) {
     pinMode(GPIO_BOMB, OUTPUT);
 
     BuzzStart();
+    onTim.setTime(0);
 }
 
 /******************************************************************************
@@ -2022,6 +2024,10 @@ void loop() {
             break;
     }
 
+    #if DEBUG
+    /* Serial loop */
+    if (onTim.count()) Serial.print(version_str);
+    #endif
 
 }
 
