@@ -3,7 +3,7 @@
 * Filename              :   Hellfire.ino
 * Author                :   Andrea Pellegrino
 * Origin Date           :   17/07/2022
-* Version               :   0.5
+* Version               :   0.6
 * Compiler              :   avr-gcc
 * Target                :   Arduino UNO (avr)
 * Notes                 :   using arduino-cli
@@ -18,8 +18,16 @@
  * 0.2: mode C (Classic) implemented                            - 31.10.2022
  * 0.3: mode D (Points) implemented                             - 01.11.2022
  * 0.4: change LED bar time + buzzer added                      - 02.11.2022
- * 0.5: correzione bug + uscita supplementare bomba esplosa     - 10.11.2022
+ * 0.5: new out "exploded bomb"                                 - 10.11.2022
+ * 0.6: new out "defused bomb"                                  - 19.11.2022
  */
+
+ /*
+  * Build Message:
+  *
+  * Sketch uses 18502 bytes (57%) of program storage space. Maximum is 32256 bytes.
+  * Global variables use 1487 bytes (72%) of dynamic memory, leaving 561 bytes for local variables. Maximum is 2048 bytes.
+  */
 
 /******************************************************************************
 * Includes
@@ -45,7 +53,7 @@
 
 /* Software Version */
 #define SW_VERSION      0
-#define SW_REVISION     5
+#define SW_REVISION     6
 
 /* I2C Address */
 #define I2C_ADR_KEY     0x20        // I2C Keypad Address (I2C Expansion PCF8574)
@@ -65,7 +73,8 @@
 #define GPIO_BZR        9
 #define GPIO_SW_GRN     8
 #define GPIO_SW_RED     7
-#define GPIO_BOMB       6
+#define GPIO_BOMB_EXP   6
+#define GPIO_BOMB_DEF   5
 
 /* Time definition */
 #define MINUTE_S        60
@@ -133,7 +142,7 @@ Button swT2(GPIO_SW_GRN);                           // Green button (team 2)
 Buzzer buzzer(GPIO_BZR);                            // Buzzer
 
 /* Version string */
-char version_str[8];    // Current version string: (es: v1.2)
+char version_str[6];    // Current version string: (es: v1.2)
 
 /* State variables */
 mode_e mode = MODE_SELECT;
@@ -268,7 +277,7 @@ bool BuzzStartGame(void) {
 }
 
 /*
- *  Buzzer start game
+ *  Bomb explosion output
  */
 bool BombExplOut(void) {
     static bool fBombExpl_first = true;
@@ -277,12 +286,20 @@ bool BombExplOut(void) {
     if(fBombExpl_first) {
         fBombExpl_first = false;
         gameTim.setTime(BOMB_OUT_S);
-        digitalWrite(GPIO_BOMB, HIGH);
+        digitalWrite(GPIO_BOMB_EXP, HIGH);
     }
     gameTime_s = gameTim.dec();
 
     /* Set LOW */
-    if (gameTime_s == 0) digitalWrite(GPIO_BOMB, LOW);
+    if (gameTime_s == 0) digitalWrite(GPIO_BOMB_EXP, LOW);
+}
+
+/*
+ *  Bomb defection output
+ */
+bool BombDefOut(void) {
+
+    digitalWrite(GPIO_BOMB_DEF, HIGH);
 }
 
 /******************************************************************************
@@ -324,8 +341,10 @@ void LCD_Init(void) {
     lcd.setCursor(0, 0);
     lcd.print("SELECT MODE GAME");
     lcd.setCursor(0, 3);
-    snprintf(version_str, 8, "v%d.%d", SW_VERSION, SW_REVISION);
+    snprintf(version_str, 6, "v%d.%d", SW_VERSION, SW_REVISION);
     lcd.print(version_str);
+    lcd.setCursor(7, 3);
+    lcd.print("By John Rampo");
 }
 
 /*
@@ -349,8 +368,9 @@ void GPIO_Init(void) {
     swT1.begin();
     swT2.begin();
 
-    /* Bomb output init */
-    pinMode(GPIO_BOMB, OUTPUT);
+    /* Bomb outputs init */
+    pinMode(GPIO_BOMB_EXP, OUTPUT);
+    pinMode(GPIO_BOMB_DEF, OUTPUT);
 
     BuzzStart();
     onTim.setTime(0);
@@ -1419,6 +1439,9 @@ void ModeB_Loop(void) {
                 ledT1.blink(500);
                 ledT2.blink(500);
 
+                /* Bomb defection output function */
+                BombDefOut();
+
                 BuzzGoodEnd();
             }
 
@@ -1639,6 +1662,9 @@ void ModeC_Loop(void) {
                 lcd.print("********************");
                 ledT1.blink(500);
                 ledT2.blink(500);
+
+                /* Bomb defection output function */
+                BombDefOut();
 
                 BuzzGoodEnd();
             }
